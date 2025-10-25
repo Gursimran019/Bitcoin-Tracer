@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Transaction Details</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #121212;
+            color: #fff;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            color: #00e5ff;
+            margin: 0;
+        }
+
+        .back-button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .back-button:hover {
+            background-color: #45a049;
+        }
+
+        .print-button {
+            padding: 10px 20px;
+            background-color: #00bcd4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-left: 10px;
+        }
+
+        .print-button:hover {
+            background-color: #0097a7;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            background: #1e1e1e;
+            table-layout: fixed;
+        }
+
+        th,
+        td {
+            border: 1px solid #333;
+            padding: 10px;
+            text-align: left;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        th {
+            background: #00bcd4;
+            font-weight: bold;
+        }
+
+        /* Column width specifications */
+        th:nth-child(1),
+        td:nth-child(1) {
+            /* Transaction ID */
+            width: 25%;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        th:nth-child(2),
+        td:nth-child(2) {
+            /* From */
+            width: 20%;
+            font-size: 11px;
+        }
+
+        th:nth-child(3),
+        td:nth-child(3) {
+            /* To */
+            width: 20%;
+            font-size: 11px;
+        }
+
+        th:nth-child(4),
+        td:nth-child(4) {
+            /* Total Input */
+            width: 10%;
+        }
+
+        th:nth-child(5),
+        td:nth-child(5) {
+            /* Total Output */
+            width: 10%;
+        }
+
+        th:nth-child(6),
+        td:nth-child(6) {
+            /* Fees */
+            width: 8%;
+        }
+
+        th:nth-child(7),
+        td:nth-child(7) {
+            /* Date & Time */
+            width: 12%;
+            font-size: 12px;
+        }
+
+        .loading {
+            text-align: center;
+            color: #00bcd4;
+            font-size: 16px;
+        }
+
+        .error {
+            text-align: center;
+            color: #ff4444;
+            font-size: 16px;
+        }
+
+        /* Print styles - Hide buttons and navigation elements */
+        @media print {
+            .back-button, .print-button {
+                display: none !important;
+            }
+            button, .button {
+                display: none !important;
+            }
+            a[href] {
+                color: inherit !important;
+                text-decoration: none !important;
+            }
+            /* Hide the button container div */
+            h2 + div {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="header">
+        <h2 id="title">Transaction Details</h2>
+        <div>
+            <a href="project-with-database.html" class="back-button">← Back to Graph</a>
+            <button onclick="printPage()" class="print-button">🖨️ Print</button>
+        </div>
+    </div>
+
+    <table id="transactionTable">
+        <thead>
+            <tr>
+                <th>Transaction ID</th>
+                <th>From</th>
+                <th>To</th>
+                <th>Total Input</th>
+                <th>Total Output</th>
+                <th>Fees</th>
+                <th>Date & Time</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td colspan="7" class="loading">Loading transaction data...</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <script>
+        // Get transaction ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const selectedTxId = urlParams.get('txid');
+
+        if (!selectedTxId) {
+            document.getElementById('title').innerText = "No Transaction Selected";
+            document.querySelector('#transactionTable tbody').innerHTML =
+                `<tr><td colspan="7" class="error">No transaction ID provided</td></tr>`;
+        } else {
+            document.getElementById('title').innerText = `Transaction Chain: ${selectedTxId.substring(0, 16)}...`;
+            loadTransactionData(selectedTxId);
+        }
+
+        // Load transaction data from PostgreSQL database
+        async function loadTransactionData(txId) {
+            const tableBody = document.querySelector('#transactionTable tbody');
+
+            try {
+                console.log('Loading transaction data for:', txId);
+
+                // Call API to get transaction chain from PostgreSQL database - FIXED PATH LOGIC
+                let response = null;
+                let successPath = null;
+                const paths = [
+                    '/bitcoin-project/api.php?action=chain&txid=' + encodeURIComponent(txId),
+                    './api.php?action=chain&txid=' + encodeURIComponent(txId),
+                    'api.php?action=chain&txid=' + encodeURIComponent(txId),
+                    '../api.php?action=chain&txid=' + encodeURIComponent(txId)
+                ];
+                
+                for (let i = 0; i < paths.length; i++) {
+                    try {
+                        console.log(`Trying path ${i + 1}:`, paths[i]);
+                        const testResponse = await fetch(paths[i]);
+                        console.log(`Path ${i + 1} status:`, testResponse.status);
+                        
+                        if (testResponse.ok) {
+                            console.log('SUCCESS with path:', paths[i]);
+                            response = testResponse;
+                            successPath = paths[i];
+                            break;
+                        } else {
+                            console.log(`Path ${i + 1} returned:`, testResponse.status, testResponse.statusText);
+                        }
+                    } catch (error) {
+                        console.log(`Path ${i + 1} failed:`, error.message);
+                    }
+                }
+
+                if (!response || !response.ok) {
+                    console.error('All API paths failed!');
+                    console.error('Tried paths:', paths);
+                    
+                    let errorMsg = 'Failed to connect to API. Tried paths: ' + paths.join(', ');
+                    if (response) {
+                        const errorText = await response.text();
+                        console.error('Last API Error:', response.status, response.statusText, errorText);
+                        errorMsg = `Failed to load data: ${response.status} - ${response.statusText}`;
+                    }
+                    
+                    tableBody.innerHTML = `<tr><td colspan="7" class="error">${errorMsg}</td></tr>`;
+                    return;
+                }
+
+                console.log('API call successful with path:', successPath);
+                const transactions = await response.json();
+                console.log('Received transactions:', transactions);
+
+                if (transactions.error) {
+                    tableBody.innerHTML = `<tr><td colspan="7" class="error">Database Error: ${transactions.error}</td></tr>`;
+                    return;
+                }
+
+                if (!transactions || transactions.length === 0) {
+                    tableBody.innerHTML = `<tr><td colspan="7" class="error">No transactions found for ${txId}</td></tr>`;
+                    return;
+                }
+
+                // Clear loading message and display transactions
+                tableBody.innerHTML = '';
+
+                transactions.forEach(tx => {
+                    const row = document.createElement('tr');
+
+                    // Handle from addresses
+                    const fromAddresses = Array.isArray(tx.from) ? tx.from.join(', ') :
+                        (tx.from || 'N/A');
+
+                    // Handle to addresses
+                    const toAddresses = Array.isArray(tx.to) ? tx.to.join(', ') :
+                        (tx.to || 'N/A');
+
+                    // Format values
+                    const totalInput = tx.total_input || 'N/A';
+                    const totalOutput = tx.total_output || 'N/A';
+                    const fees = tx.fees || 'N/A';
+                    const formattedDate = tx.date || 'N/A';
+
+                    row.innerHTML = `
+            <td title="${tx.id}">${tx.id}</td>
+            <td>${fromAddresses}</td>
+            <td>${toAddresses}</td>
+            <td>${totalInput}</td>
+            <td>${totalOutput}</td>
+            <td>${fees}</td>
+            <td>${formattedDate}</td>
+          `;
+                    tableBody.appendChild(row);
+                });
+
+                console.log(`Loaded ${transactions.length} transactions successfully`);
+
+            } catch (error) {
+                console.error('Error loading transaction data:', error);
+                tableBody.innerHTML = `<tr><td colspan="7" class="error">Connection Error: ${error.message}</td></tr>`;
+            }
+        }
+
+        // Print page function
+        function printPage() {
+            window.print();
+        }
+    </script>
+</body>
+
+</html>

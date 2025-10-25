@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 180" width="300" height="180">
+  <!-- NCFL Large Letters - Slightly increased spacing -->
+  <text x="0" y="70" font-family="Arial, sans-serif" font-size="60" font-weight="900" fill="#1E88E5">N</text>
+  <text x="45" y="70" font-family="Arial, sans-serif" font-size="60" font-weight="900" fill="#E53935">C</text>
+  <text x="90" y="70" font-family="Arial, sans-serif" font-size="60" font-weight="900" fill="#43A047">F</text>
+  <text x="135" y="70" font-family="Arial, sans-serif" font-size="60" font-weight="900" fill="#FF9800">L</text>
+  
+  <!-- Full words - Larger font size with exact matching colors -->
+  <text x="0" y="100" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#1E88E5">National</text>
+  <text x="0" y="125" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#E53935">Cyber</text>
+  <text x="0" y="150" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#43A047">Forensic</text>
+  <text x="0" y="175" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#FF9800">Laboratory</text>
+</svg>

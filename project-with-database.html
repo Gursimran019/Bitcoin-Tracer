@@ -1,0 +1,4766 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NCFL - Bitcoin Forensic Analysis Tool</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <script src="https://unpkg.com/vis-network@9.1.2/dist/vis-network.min.js"></script>
+    <link href="https://unpkg.com/vis-network@9.1.2/styles/vis-network.min.css" rel="stylesheet" />
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        /* CSS Custom Properties for Theme Support */
+        :root {
+            /* Dark mode colors (default) */
+            --bg-primary: #000;
+            --bg-secondary: rgba(0, 0, 0, 0.7);
+            --text-primary: white;
+            --text-secondary: #ffffff;
+            --accent-color: #00bcd4;
+            --accent-hover: #0097a7;
+            --border-color: #333;
+            --card-bg: rgba(18, 31, 47, 0.9);
+            --overlay-bg: rgba(0, 0, 0, 0.8);
+            --background-image: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.8)),
+                url('background.png');
+        }
+
+        /* Light mode colors */
+        @media (prefers-color-scheme: light) {
+            :root {
+                --bg-primary: #f5f5f5;
+                --bg-secondary: rgba(255, 255, 255, 0.9);
+                --text-primary: #333;
+                --text-secondary: #666;
+                --accent-color: #0077b6;
+                --accent-hover: #005a8a;
+                --border-color: #ddd;
+                --card-bg: rgba(255, 255, 255, 0.95);
+                --overlay-bg: rgba(255, 255, 255, 0.9);
+                --background-image: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.8)),
+                    url('background.png');
+            }
+        }
+
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow: auto;
+            background: var(--bg-primary);
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: var(--background-image);
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            z-index: 0;
+            animation: backgroundMove 30s ease-in-out infinite alternate;
+        }
+
+        header {
+            position: relative;
+            width: 100%;
+            padding: 20px 0;
+            background: transparent;
+            z-index: 10;
+            height: 120px;
+        }
+
+        .header-inner {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-left {
+            position: absolute;
+            left: -10px;
+            top: 0;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            margin: 0;
+            padding: 0;
+        }
+
+        .logo-left img {
+            width: 650px;
+            height: 260px;
+            margin: 0;
+            padding: 0;
+            display: block;
+            margin-left: -60px;
+            margin-top: 120px;
+        }
+
+        .logo-right {
+            position: absolute;
+            right: 60px;
+            top: 10px;
+            display: flex;
+            align-items: center;
+            margin: 0;
+            padding: 0;
+        }
+
+        .logo-right img {
+            width: 400px;
+            height: auto;
+            max-height: 200px;
+            margin: 0;
+            padding: 0;
+            display: block;
+            object-fit: contain;
+            border-radius: 8px;
+        }
+
+        .header-title {
+            font-size: 32px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin: 0;
+            padding: 15px 30px;
+            background: var(--card-bg);
+            border: 2px solid var(--accent-color);
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 188, 212, 0.3);
+            backdrop-filter: blur(10px);
+            text-align: center;
+            min-width: 400px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px 20px 0px;
+            text-align: center;
+            z-index: 10;
+            position: relative;
+        }
+
+        .search-group {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 0px;
+            margin-bottom: 0px;
+            margin-top: 20px;
+            max-width: 90%;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .search-row {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .filter-row {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .action-buttons {
+            width: 100%;
+            justify-content: center;
+        }
+
+        /* Responsive design for smaller screens */
+        @media (max-width: 768px) {
+            input[type='text'] {
+                width: 300px;
+                font-size: 16px;
+                padding: 15px 20px;
+            }
+
+            .search-row form {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+
+
+            .action-buttons {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+
+            button {
+                width: auto;
+                min-width: 120px;
+                font-size: 14px;
+                padding: 12px 20px;
+            }
+        }
+
+        input[type='text'] {
+            width: 600px;
+            padding: 18px 24px;
+            border: none;
+            border-radius: 10px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 18px;
+            outline: none;
+            cursor: pointer;
+            border: 2px solid var(--border-color);
+        }
+
+        input[type='text']:focus {
+            box-shadow: 0 0 0 3px var(--accent-color);
+            border-color: var(--accent-color);
+        }
+
+        input[type='text']::placeholder {
+            color: var(--text-secondary);
+        }
+
+
+
+        button {
+            padding: 18px 30px;
+            background-color: var(--accent-color);
+            color: var(--text-primary);
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 180px;
+            height: 60px;
+            border: 2px solid var(--accent-color);
+            text-align: center;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 188, 212, 0.4);
+        }
+
+        /* Specific styling for Receiver End button to fit text properly */
+        #receiverEndBtn {
+            width: 200px;
+            font-size: 15px;
+            padding: 8px 20px;
+        }
+
+        #graph {
+            width: 100%;
+            height: 100vh;
+            background: transparent;
+            display: none;
+            cursor: grab;
+            margin-top: 0px;
+            opacity: 1;
+            transition: opacity 0.3s ease;
+        }
+
+        /* Transaction List Styles */
+        #transactionList {
+            position: fixed;
+            top: 280px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: 100%;
+            height: calc(100% - 280px);
+            z-index: 100;
+            background: var(--bg-primary);
+            overflow: auto;
+            display: none;
+            padding: 20px;
+            opacity: 1;
+            transition: opacity 0.3s ease;
+        }
+
+        .list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .list-title {
+            color: #00e5ff;
+            font-size: 24px;
+            margin: 0;
+        }
+
+        .list-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .back-btn,
+        .print-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .back-btn {
+            background-color: #4CAF50;
+            color: var(--text-primary);
+        }
+
+        .back-btn:hover {
+            background-color: #45a049;
+        }
+
+        .print-btn {
+            background-color: var(--accent-color);
+            color: var(--text-primary);
+        }
+
+        .print-btn:hover {
+            background-color: var(--accent-hover);
+        }
+
+        #transactionTable {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--card-bg);
+            table-layout: fixed;
+        }
+
+        #transactionTable th,
+        #transactionTable td {
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            text-align: left;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            color: var(--text-primary);
+        }
+
+        #transactionTable tbody tr:hover {
+            background-color: rgba(0, 188, 212, 0.1);
+            transition: background-color 0.2s ease;
+        }
+
+        #transactionTable tbody tr {
+            transition: background-color 0.2s ease;
+            vertical-align: top;
+        }
+
+        #transactionTable td {
+            vertical-align: top;
+            line-height: 1.4;
+            min-height: 40px;
+        }
+
+        #transactionTable th {
+            background: var(--accent-color);
+            font-weight: bold;
+            color: var(--text-primary);
+        }
+
+        #transactionTable th:nth-child(1),
+        #transactionTable td:nth-child(1) {
+            width: 30%;
+            font-family: monospace;
+            font-size: 12px;
+            word-break: break-all;
+        }
+
+        #transactionTable th:nth-child(2),
+        #transactionTable td:nth-child(2) {
+            width: 25%;
+            font-size: 11px;
+            word-break: break-all;
+        }
+
+        #transactionTable th:nth-child(3),
+        #transactionTable td:nth-child(3) {
+            width: 25%;
+            font-size: 11px;
+            word-break: break-all;
+        }
+
+        #transactionTable th:nth-child(4),
+        #transactionTable td:nth-child(4) {
+            width: 8%;
+            text-align: right;
+        }
+
+        #transactionTable th:nth-child(5),
+        #transactionTable td:nth-child(5) {
+            width: 8%;
+            text-align: right;
+        }
+
+        #transactionTable th:nth-child(6),
+        #transactionTable td:nth-child(6) {
+            width: 14%;
+            font-size: 12px;
+        }
+
+        .loading-row {
+            text-align: center;
+            color: var(--accent-color);
+            font-size: 16px;
+        }
+
+        .error-row {
+            text-align: center;
+            color: #ff4444;
+            font-size: 16px;
+        }
+
+        .vis-network {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* Gradient CSS classes for mixed-role nodes */
+        .gradient-node-mixed {
+            background: linear-gradient(135deg, #00bcd4 0%, #0077b6 100%) !important;
+            background: -webkit-linear-gradient(135deg, #00bcd4 0%, #0077b6 100%) !important;
+            background: -moz-linear-gradient(135deg, #00bcd4 0%, #0077b6 100%) !important;
+            background: -o-linear-gradient(135deg, #00bcd4 0%, #0077b6 100%) !important;
+            background: -ms-linear-gradient(135deg, #00bcd4 0%, #0077b6 100%) !important;
+            border: 4px dashed #00bcd4 !important;
+            border-radius: 4px !important;
+        }
+
+        .gradient-node-mixed-highlight {
+            background: linear-gradient(135deg, #00e5ff 0%, #0088cc 100%) !important;
+            background: -webkit-linear-gradient(135deg, #00e5ff 0%, #0088cc 100%) !important;
+            background: -moz-linear-gradient(135deg, #00e5ff 0%, #0088cc 100%) !important;
+            background: -o-linear-gradient(135deg, #00e5ff 0%, #0088cc 100%) !important;
+            background: -ms-linear-gradient(135deg, #00e5ff 0%, #0088cc 100%) !important;
+            border: 4px dashed #00e5ff !important;
+            border-radius: 4px !important;
+        }
+
+        /* Vis.js network node styling for gradients */
+        .vis-network .vis-node.gradient-mixed {
+            background: linear-gradient(135deg, #00bcd4 0%, #0077b6 100%);
+            border: 4px dashed #00bcd4;
+        }
+
+        .vis-network .vis-node.gradient-mixed:hover {
+            background: linear-gradient(135deg, #00e5ff 0%, #0088cc 100%);
+            border: 4px dashed #00e5ff;
+        }
+
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #00bcd4;
+            font-size: 18px;
+            z-index: 15;
+        }
+
+        @keyframes spinLogo {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes backgroundMove {
+            0% {
+                background-position: center top;
+            }
+
+            100% {
+                background-position: center bottom;
+            }
+        }
+
+        /* Date & Time Filter Overlay Styles */
+        .date-filter-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .date-filter-content {
+            background: var(--card-bg);
+            border: 2px solid var(--accent-color);
+            border-radius: 12px;
+            padding: 25px;
+            min-width: 400px;
+            max-width: 500px;
+            box-shadow: 0 10px 30px rgba(0, 188, 212, 0.3);
+        }
+
+        .date-filter-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .date-filter-header h3 {
+            color: var(--accent-color);
+            margin: 0;
+            font-size: 18px;
+        }
+
+        .close-filter {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 18px;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 4px;
+            width: auto;
+            height: auto;
+        }
+
+        .close-filter:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: none;
+            box-shadow: none;
+        }
+
+        .date-inputs {
+            margin-bottom: 20px;
+        }
+
+        .date-input-group {
+            margin-bottom: 15px;
+        }
+
+        .date-input-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .date-input-group input[type="datetime-local"],
+        .date-input-group input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .date-input-group input[type="datetime-local"]:focus,
+        .date-input-group input[type="text"]:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 2px rgba(0, 188, 212, 0.2);
+            outline: none;
+        }
+
+        .filter-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+
+        .filter-actions button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            width: auto;
+            height: auto;
+        }
+
+        #applyDateFilter {
+            background-color: var(--accent-color);
+            color: var(--text-primary);
+        }
+
+        #applyDateFilter:enabled:hover {
+            background-color: var(--accent-hover);
+            transform: translateY(-1px);
+        }
+
+        #applyDateFilter:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        #cancelDateFilter {
+            background-color: #666;
+            color: var(--text-primary);
+        }
+
+        #cancelDateFilter:hover {
+            background-color: #777;
+            transform: translateY(-1px);
+        }
+
+        #clearDateFilter {
+            background-color: #ff5722;
+            color: white;
+        }
+
+        #clearDateFilter:hover {
+            background-color: #e64a19;
+            transform: translateY(-1px);
+        }
+
+        .filter-error {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(0, 188, 212, 0.1);
+            border: 1px solid #00bcd4;
+            border-radius: 4px;
+            color: #00bcd4;
+            font-size: 14px;
+        }
+
+        /* View Type Radio Button Styles */
+        .view-type-options {
+            display: flex;
+            gap: 20px;
+            margin-top: 8px;
+        }
+
+        .radio-option {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+
+        .radio-option input[type="radio"] {
+            margin-right: 8px;
+            width: 16px;
+            height: 16px;
+            accent-color: var(--accent-color);
+        }
+
+        .radio-label {
+            font-weight: 500;
+        }
+
+        .radio-option:hover .radio-label {
+            color: var(--accent-color);
+        }
+
+        .custom-dialog {
+            position: fixed;
+            background: rgba(18, 31, 47, 0.95);
+            border: 2px solid #00bcd4;
+            border-radius: 8px;
+            padding: 15px;
+            z-index: 1000;
+            font-size: 12px;
+            color: white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            display: none;
+        }
+
+        .dialog-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .dialog-btn {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .dialog-btn.list {
+            background-color: #00bcd4;
+            color: white;
+        }
+
+        .dialog-btn.show-only {
+            background-color: #ff5722;
+            color: white;
+        }
+
+        .dialog-btn:hover {
+            opacity: 0.8;
+            transform: translateY(-1px);
+        }
+
+        /* Help Popup Modal Styles */
+        .help-modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+        }
+
+        .help-modal-content {
+            background: linear-gradient(135deg, rgba(18, 31, 47, 0.95), rgba(0, 121, 107, 0.1));
+            margin: 3% auto;
+            padding: 25px;
+            border: 2px solid #00bcd4;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 1000px;
+            box-shadow: 0 10px 30px rgba(0, 188, 212, 0.3);
+            color: white;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .help-modal h2 {
+            color: #00bcd4;
+            margin-top: 0;
+            font-size: 24px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .help-modal h3 {
+            color: #00e5ff;
+            font-size: 18px;
+            margin-top: 25px;
+            margin-bottom: 10px;
+        }
+
+        .help-modal p,
+        .help-modal li {
+            line-height: 1.6;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .help-modal ul {
+            padding-left: 20px;
+        }
+
+        .help-close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-top: -10px;
+        }
+
+        .help-close:hover {
+            color: #00bcd4;
+        }
+
+        .help-section {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(0, 188, 212, 0.1);
+            border-radius: 8px;
+            border-left: 4px solid #00bcd4;
+        }
+
+        .theme-toggle {
+            position: absolute;
+            top: 0px;
+            right: 60px;
+            width: 40px;
+            height: 40px;
+            background: var(--accent-color);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 15;
+            font-size: 18px;
+            font-weight: bold;
+            color: var(--text-primary);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+            pointer-events: auto;
+        }
+
+        .theme-toggle:hover {
+            background: var(--accent-hover);
+            transform: scale(1.1);
+        }
+
+        .help-icon {
+            position: absolute;
+            top: 0px;
+            right: 10px;
+            width: 40px;
+            height: 40px;
+            background: var(--accent-color);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 15;
+            font-size: 20px;
+            font-weight: bold;
+            color: var(--text-primary);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+            pointer-events: auto;
+        }
+
+        .help-icon:hover {
+            background: var(--accent-hover);
+            transform: scale(1.1);
+        }
+
+        .about-popup {
+            position: fixed;
+            top: 50px;
+            right: 20px;
+            background: linear-gradient(135deg, #1e3c72, #2a5298);
+            border-radius: 12px;
+            padding: 20px;
+            display: none;
+            z-index: 2000;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+            border: 2px solid #00bcd4;
+            max-width: 90vw;
+            max-height: 90vh;
+        }
+
+        .about-content {
+            position: relative;
+            text-align: center;
+        }
+
+        .close-modal {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            width: 30px;
+            height: 30px;
+            font-size: 20px;
+            color: white;
+            cursor: pointer;
+            background: #00bcd4;
+            border: none;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .close-modal:hover {
+            background: #0097a7;
+        }
+
+        .about-image {
+            max-width: 100%;
+            max-height: 70vh;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        /* I4C Logo Styles */
+        .i4c-logo {
+            width: 500px;
+            height: 120px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            filter: drop-shadow(0 0 10px rgba(0, 188, 212, 1.0));
+        }
+
+        .i4c-main {
+            display: flex;
+            align-items: center;
+            gap: 25px;
+            margin-bottom: 12px;
+        }
+
+        .i4c-letter {
+            font-size: 80px;
+            font-weight: bold;
+            color: #4A90E2;
+            font-family: 'Inter', sans-serif;
+            text-shadow: 0 0 20px rgba(74, 144, 226, 0.8);
+            line-height: 1;
+        }
+
+        .i4c-symbol {
+            position: relative;
+            width: 120px;
+            height: 80px;
+            margin-right: 20px;
+        }
+
+        .curved-arcs {
+            position: relative;
+            width: 80px;
+            height: 50px;
+        }
+
+        .arc-layer {
+            position: absolute;
+            border: 6px solid;
+            border-bottom: none;
+            border-left: none;
+            border-right: none;
+            border-radius: 50px 50px 0 0;
+        }
+
+        .arc-cyan {
+            width: 70px;
+            height: 35px;
+            border-color: #00bcd4;
+            top: 15px;
+            left: 5px;
+            filter: drop-shadow(0 0 8px rgba(0, 188, 212, 0.8));
+        }
+
+        .arc-red {
+            width: 60px;
+            height: 30px;
+            border-color: #ff4444;
+            top: 20px;
+            left: 10px;
+            filter: drop-shadow(0 0 8px rgba(255, 68, 68, 0.8));
+        }
+
+        .arc-green {
+            width: 50px;
+            height: 25px;
+            border-color: #4CAF50;
+            top: 25px;
+            left: 15px;
+            filter: drop-shadow(0 0 8px rgba(76, 175, 80, 0.8));
+        }
+
+        .arc-yellow {
+            width: 40px;
+            height: 20px;
+            border-color: #FFC107;
+            top: 30px;
+            left: 20px;
+            filter: drop-shadow(0 0 8px rgba(255, 193, 7, 0.8));
+        }
+
+        .cloud-system {
+            position: absolute;
+            right: -20px;
+            top: 10px;
+            width: 60px;
+            height: 30px;
+        }
+
+        .cloud-main {
+            width: 35px;
+            height: 18px;
+            background: #4A90E2;
+            border-radius: 18px;
+            position: relative;
+            filter: drop-shadow(0 0 8px rgba(74, 144, 226, 0.8));
+        }
+
+        .cloud-main::before {
+            content: '';
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: #4A90E2;
+            border-radius: 50%;
+            top: -6px;
+            left: 6px;
+        }
+
+        .cloud-main::after {
+            content: '';
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #4A90E2;
+            border-radius: 50%;
+            top: -5px;
+            right: 6px;
+        }
+
+        .connection-line {
+            position: absolute;
+            background: #4A90E2;
+            height: 3px;
+            border-radius: 2px;
+            filter: drop-shadow(0 0 5px rgba(74, 144, 226, 0.8));
+        }
+
+        .line1 {
+            width: 30px;
+            top: 6px;
+            right: -30px;
+        }
+
+        .line2 {
+            width: 25px;
+            top: 12px;
+            right: -25px;
+        }
+
+        .connection-dot {
+            position: absolute;
+            width: 5px;
+            height: 5px;
+            background: #4A90E2;
+            border-radius: 50%;
+            filter: drop-shadow(0 0 5px rgba(74, 144, 226, 0.8));
+        }
+
+        .dot1 {
+            top: 4px;
+            right: -32px;
+        }
+
+        .dot2 {
+            top: 10px;
+            right: -27px;
+        }
+
+        .i4c-text {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .text-line {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4A90E2;
+            font-family: 'Inter', sans-serif;
+            line-height: 1.1;
+            text-shadow: 0 0 10px rgba(74, 144, 226, 0.6);
+        }
+
+        .i4c-bottom {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-top: 5px;
+            font-size: 16px;
+            color: #4A90E2;
+            width: 50px;
+            height: 50px;
+        }
+
+        .hindi-text {
+            font-weight: bold;
+        }
+
+        .separator {
+            font-weight: bold;
+        }
+
+        .english-text {
+            font-weight: normal;
+        }
+
+        /* Print styles - Hide buttons and interactive elements */
+        @media print {
+
+            /* Hide all buttons and interactive elements */
+            button,
+            .button {
+                display: none !important;
+            }
+
+            .list-buttons,
+            .dialog-buttons {
+                display: none !important;
+            }
+
+            .back-btn,
+            .print-btn,
+            .back-button,
+            .print-button {
+                display: none !important;
+            }
+
+            .help-icon,
+            .theme-toggle {
+                display: none !important;
+            }
+
+            /* Hide any navigation or action buttons */
+            a[onclick],
+            button[onclick] {
+                display: none !important;
+            }
+
+            /* Hide header and other non-essential elements */
+            header {
+                display: none !important;
+            }
+
+            .container {
+                display: none !important;
+            }
+
+            /* Ensure transaction list takes full page */
+            #transactionList {
+                position: static !important;
+                top: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                bottom: 0 !important;
+                width: 100% !important;
+                height: auto !important;
+                padding: 20px !important;
+                background: white !important;
+                color: black !important;
+            }
+
+            /* Style the list header for print */
+            .list-header {
+                margin-bottom: 20px !important;
+                border-bottom: 2px solid #333 !important;
+                padding-bottom: 10px !important;
+            }
+
+            .list-title {
+                color: #333 !important;
+                font-size: 18px !important;
+                margin: 0 !important;
+            }
+
+            /* Optimize table for print */
+            #transactionTable {
+                width: 100% !important;
+                border-collapse: collapse !important;
+                background: white !important;
+                color: black !important;
+                font-size: 8px !important;
+                table-layout: fixed !important;
+            }
+
+            #transactionTable th,
+            #transactionTable td {
+                border: 1px solid #333 !important;
+                padding: 4px !important;
+                color: black !important;
+                background: white !important;
+                word-wrap: break-word !important;
+                overflow-wrap: break-word !important;
+                vertical-align: top !important;
+            }
+
+            #transactionTable th {
+                background: #f0f0f0 !important;
+                font-weight: bold !important;
+                color: black !important;
+            }
+
+            /* Print column widths for 6 columns */
+            #transactionTable th:nth-child(1),
+            #transactionTable td:nth-child(1) {
+                width: 30% !important;
+                font-family: monospace !important;
+            }
+
+            #transactionTable th:nth-child(2),
+            #transactionTable td:nth-child(2) {
+                width: 25% !important;
+            }
+
+            #transactionTable th:nth-child(3),
+            #transactionTable td:nth-child(3) {
+                width: 25% !important;
+            }
+
+            #transactionTable th:nth-child(4),
+            #transactionTable td:nth-child(4) {
+                width: 8% !important;
+                text-align: right !important;
+            }
+
+            #transactionTable th:nth-child(5),
+            #transactionTable td:nth-child(5) {
+                width: 8% !important;
+                text-align: right !important;
+            }
+
+            #transactionTable th:nth-child(6),
+            #transactionTable td:nth-child(6) {
+                width: 14% !important;
+            }
+
+            /* Ensure proper page breaks */
+            #transactionTable {
+                page-break-inside: auto !important;
+            }
+
+            #transactionTable tr {
+                page-break-inside: avoid !important;
+                page-break-after: auto !important;
+            }
+
+            #transactionTable thead {
+                display: table-header-group !important;
+            }
+
+            /* Hide loading and error rows in print */
+            .loading-row,
+            .error-row {
+                display: none !important;
+            }
+        }
+
+        /* Print preparation class */
+        body.printing {
+            overflow: hidden;
+        }
+
+        body.printing #transactionList {
+            z-index: 9999;
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <div class="header-inner">
+            <div class="logo-left">
+                <img src="ncfl-logo.svg" alt="NCFL Logo" />
+            </div>
+            <h1 class="header-title">Bitcoin Forensic Analysis Tool</h1>
+            <div class="logo-right">
+                <img src="I4C-logo.png" alt="I4C Official Logo" />
+            </div>
+            <!-- Theme Toggle Icon -->
+            <div class="theme-toggle" onclick="toggleTheme()" title="Toggle Theme">
+                <i class="fas fa-adjust"></i>
+            </div>
+            <!-- Help Icon -->
+            <div class="help-icon" onclick="showAboutModal()">
+                <i class="fas fa-question"></i>
+            </div>
+        </div>
+    </header>
+
+    <!-- About Popup -->
+    <div id="aboutPopup" class="about-popup">
+        <div class="about-content">
+            <button class="close-modal" onclick="closeAboutModal()">&times;</button>
+            <div class="team-info">
+                <h2 style="text-align: center; color: #00bcd4; margin-bottom: 30px; font-size: 24px;">NATIONAL CYBER FORENSIC LAB</h2>
+                
+                <!-- Interns Row -->
+                <div class="team-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; margin-bottom: 40px;">
+                    <div class="team-member" style="text-align: center;">
+                        <img src="Gursimran.png" alt="Gursimranpreet kaur" style="width: 120px; height: 150px; object-fit: cover; margin: 0 auto 15px; border-radius: 8px; display: block;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="member-photo" style="width: 120px; height: 150px; background: #f0f0f0; margin: 0 auto 15px; border-radius: 8px; display: none; align-items: center; justify-content: center; color: #666;">
+                            Photo
+                        </div>
+                        <h3 style="color: #00bcd4; margin: 10px 0 5px; font-size: 16px;">Gursimranpreet kaur</h3>
+                        <p style="margin: 5px 0; font-size: 14px; color: #ccc;">(Desh Bhagat University)</p>
+                        <p style="margin: 5px 0; font-size: 14px; color: #ccc;">NCFL Intern</p>
+                    </div>
+                    
+                    <div class="team-member" style="text-align: center;">
+                        <img src="Manav.png" alt="Manav Sharma" style="width: 120px; height: 150px; object-fit: cover; margin: 0 auto 15px; border-radius: 8px; display: block;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="member-photo" style="width: 120px; height: 150px; background: #f0f0f0; margin: 0 auto 15px; border-radius: 8px; display: none; align-items: center; justify-content: center; color: #666;">
+                            Photo
+                        </div>
+                        <h3 style="color: #00bcd4; margin: 10px 0 5px; font-size: 16px;">Manav Sharma</h3>
+                        <p style="margin: 5px 0; font-size: 14px; color: #ccc;">(Desh Bhagat University)</p>
+                        <p style="margin: 5px 0; font-size: 14px; color: #ccc;">NCFL Intern</p>
+                    </div>
+                    
+                    <div class="team-member" style="text-align: center;">
+                        <img src="Vatsal.png" alt="Vatsal Sharma" style="width: 120px; height: 150px; object-fit: cover; margin: 0 auto 15px; border-radius: 8px; display: block;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="member-photo" style="width: 120px; height: 150px; background: #f0f0f0; margin: 0 auto 15px; border-radius: 8px; display: none; align-items: center; justify-content: center; color: #666;">
+                            Photo
+                        </div>
+                        <h3 style="color: #00bcd4; margin: 10px 0 5px; font-size: 16px;">Vatsal Sharma</h3>
+                        <p style="margin: 5px 0; font-size: 14px; color: #ccc;">The NorthCap Uni.</p>
+                        <p style="margin: 5px 0; font-size: 14px; color: #ccc;">NCFL Intern</p>
+                    </div>
+                </div>
+                
+                <!-- Supervisors Row -->
+                <div class="supervisors-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 50px; margin-top: 30px; justify-items: center;">
+                    <div class="team-member" style="text-align: center;">
+                        <img src="Shahrukh.png" alt="Shahrukh Sir" style="width: 120px; height: 150px; object-fit: cover; margin: 0 auto 15px; border-radius: 8px; display: block;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="member-photo" style="width: 120px; height: 150px; background: #f0f0f0; margin: 0 auto 15px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #666;">
+                            Photo
+                        </div>
+                        <h3 style="color: #00bcd4; margin: 10px 0 5px; font-size: 18px;">Shahrukh Sir</h3>
+                        <p style="margin: 5px 0; font-size: 14px; color: #ccc;">Supervisor</p>
+                    </div>
+                    
+                    <div class="team-member" style="text-align: center;">
+                        <img src="ACP.png" alt="Vijay Sir (ACP)" style="width: 120px; height: 150px; object-fit: cover; margin: 0 auto 15px; border-radius: 8px; display: block;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="member-photo" style="width: 120px; height: 150px; background: #f0f0f0; margin: 0 auto 15px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #666;">
+                            Photo
+                        </div>
+                        <h3 style="color: #00bcd4; margin: 10px 0 5px; font-size: 18px;">Vijay Sir (ACP)</h3>
+                        <p style="margin: 5px 0; font-size: 14px; color: #ccc;">Assistant Commissioner of Police</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="search-group">
+            <!-- Main Search Row -->
+            <div class="search-row"
+                style="display: flex; gap: 15px; align-items: center; justify-content: center; margin-bottom: 15px;">
+                <form onsubmit="event.preventDefault(); searchTransaction(); return false;"
+                    style="display: flex; gap: 10px; align-items: center;">
+                    <input type="text" id="searchInput" placeholder="Enter Wallet Address"
+                        onkeypress="if(event.key==='Enter' || event.keyCode===13){event.preventDefault(); searchTransaction();}" />
+
+                    <button type="button" onclick="searchTransaction()">
+                        <i class="fas fa-search"></i> Search
+                    </button>
+                </form>
+            </div>
+
+
+            <!-- Action Buttons Row -->
+            <div class="action-buttons" style="display: flex; gap: 15px; align-items: center; justify-content: center;">
+                <button type="button" onclick="printGraphInfo()">
+                    <i class="fas fa-print"></i> Print Graph Info
+                </button>
+                <button type="button" id="listBtn" onclick="showAllTransactionsList()">
+                    <i class="fas fa-list"></i> List
+                </button>
+                <button type="button" id="timeFilterBtn" onclick="showTimeFilter()" style="display: none;">
+                    <i class="fas fa-clock"></i> Time Filter
+                </button>
+                <button type="button" id="receiverEndBtn" onclick="showReceiverEnd()" style="display: none;">
+                    <i class="fas fa-arrow-right"></i> Receiver End
+                </button>
+            </div>
+        </div>
+        <div id="loading" class="loading" style="display: none;">Loading transactions...</div>
+    </div>
+
+    <div id="graph"></div>
+
+    <!-- Transaction List Overlay -->
+    <div id="transactionList">
+        <div class="list-header">
+            <h2 class="list-title" id="listTitle">All Transactions</h2>
+            <div class="list-buttons">
+                <button class="back-btn" onclick="hideTransactionList()">
+                    <i class="fas fa-arrow-left"></i> Back to Graph
+                </button>
+                <button class="print-btn" onclick="printTransactionList()">
+                    <i class="fas fa-print"></i> Print
+                </button>
+            </div>
+        </div>
+
+        <div id="tableContainer">
+            <table id="transactionTable">
+                <thead>
+                    <tr>
+                        <th>Transaction Hash</th>
+                        <th>From Address</th>
+                        <th>To Address</th>
+                        <th>Amount (BTC)</th>
+                        <th>Fee (BTC)</th>
+                        <th>Timestamp</th>
+                    </tr>
+                </thead>
+                <tbody id="transactionTableBody">
+                    <tr class="loading-row" id="loadingRow">
+                        <td colspan="6">
+                            <i class="fas fa-spinner fa-spin"></i> Loading transactions...
+                        </td>
+                    </tr>
+                    <tr class="error-row" id="errorRow" style="display: none;">
+                        <td colspan="6">
+                            <i class="fas fa-exclamation-triangle"></i> <span id="errorMessage">Error loading
+                                transactions</span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Time Filter Overlay -->
+    <div id="timeFilter" class="date-filter-overlay" style="display: none;"
+        onclick="if(event.target === this) hideTimeFilter();">
+        <div class="date-filter-content">
+            <div class="date-filter-header">
+                <h3>Time Filter</h3>
+                <button class="close-filter" onclick="hideTimeFilter()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="date-inputs">
+                <div class="date-input-group">
+                    <label for="walletAddress">Wallet Address:</label>
+                    <input type="text" id="walletAddress" placeholder="Enter wallet address" />
+                </div>
+                <div class="date-input-group">
+                    <label for="startTime">Start Time:</label>
+                    <input type="text" id="startTime" placeholder="DD-MM-YYYY HH:MM:SS" />
+                </div>
+                <div class="date-input-group">
+                    <label for="endTime">End Time:</label>
+                    <input type="text" id="endTime" placeholder="DD-MM-YYYY HH:MM:SS" />
+                </div>
+                <div id="viewTypeSection" class="date-input-group" style="display: none;">
+                    <label>View Type:</label>
+                    <div class="view-type-options">
+                        <label class="radio-option">
+                            <input type="radio" name="viewType" value="list" id="viewTypeList" checked>
+                            <span class="radio-label">List</span>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="viewType" value="graph" id="viewTypeGraph">
+                            <span class="radio-label">Graph</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+            <div class="filter-actions">
+                <button id="applyTimeFilter" onclick="applyTimeFilter()">Apply Filter</button>
+                <button id="cancelTimeFilter" onclick="hideTimeFilter()">Cancel</button>
+            </div>
+            <div id="timeFilterError" class="filter-error" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Custom Dialog -->
+    <div id="customDialog" class="custom-dialog">
+        <div id="dialogContent">
+            <strong>Transaction Options</strong>
+        </div>
+        <div class="dialog-buttons">
+            <button class="dialog-btn list" onclick="handleDialogAction('list')">
+                <i class="fas fa-list"></i> List
+            </button>
+            <button class="dialog-btn show-only" onclick="handleDialogAction('show-only')">
+                <i class="fas fa-eye"></i> Show Only
+            </button>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div id="helpModal" class="help-modal">
+        <div class="help-modal-content">
+            <span class="help-close" onclick="closeHelpModal()">&times;</span>
+            <h2><i class="fas fa-palette"></i> UI Design Team</h2>
+
+            <div class="help-section">
+                <h3><i class="fas fa-users"></i> About the Designers</h3>
+                <p>This Bitcoin Forensic Analysis Tool UI was designed and developed by our talented team. Upload photos
+                    of the design team members below:</p>
+            </div>
+
+            <div class="help-section">
+                <h3><i class="fas fa-camera"></i> Design Team Photos</h3>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin-top: 20px;">
+                    <!-- Designer 1 -->
+                    <div style="text-align: center;">
+                        <div id="photo1Container"
+                            style="width: 200px; height: 200px; border: 2px dashed #00bcd4; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; background: rgba(0, 188, 212, 0.1); cursor: pointer;"
+                            onclick="document.getElementById('photo1Input').click();">
+                            <div id="photo1Preview"
+                                style="display: none; width: 100%; height: 100%; border-radius: 8px; background-size: cover; background-position: center;">
+                            </div>
+                            <div id="photo1Placeholder" style="text-align: center; color: #00bcd4;">
+                                <i class="fas fa-plus"
+                                    style="font-size: 24px; margin-bottom: 10px; display: block;"></i>
+                                <span style="font-size: 12px;">Upload Photo 1</span>
+                            </div>
+                        </div>
+                        <input type="file" id="photo1Input" accept="image/*" style="display: none;"
+                            onchange="handlePhotoUpload(1, this)">
+                        <input type="text" id="name1" placeholder="Designer Name"
+                            style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #00bcd4; background: rgba(255, 255, 255, 0.1); color: white; text-align: center;">
+                    </div>
+
+                    <!-- Designer 2 -->
+                    <div style="text-align: center;">
+                        <div id="photo2Container"
+                            style="width: 200px; height: 200px; border: 2px dashed #00bcd4; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; background: rgba(0, 188, 212, 0.1); cursor: pointer;"
+                            onclick="document.getElementById('photo2Input').click();">
+                            <div id="photo2Preview"
+                                style="display: none; width: 100%; height: 100%; border-radius: 8px; background-size: cover; background-position: center;">
+                            </div>
+                            <div id="photo2Placeholder" style="text-align: center; color: #00bcd4;">
+                                <i class="fas fa-plus"
+                                    style="font-size: 24px; margin-bottom: 10px; display: block;"></i>
+                                <span style="font-size: 12px;">Upload Photo 2</span>
+                            </div>
+                        </div>
+                        <input type="file" id="photo2Input" accept="image/*" style="display: none;"
+                            onchange="handlePhotoUpload(2, this)">
+                        <input type="text" id="name2" placeholder="Designer Name"
+                            style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #00bcd4; background: rgba(255, 255, 255, 0.1); color: white; text-align: center;">
+                    </div>
+
+                    <!-- Designer 3 -->
+                    <div style="text-align: center;">
+                        <div id="photo3Container"
+                            style="width: 200px; height: 200px; border: 2px dashed #00bcd4; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; background: rgba(0, 188, 212, 0.1); cursor: pointer;"
+                            onclick="document.getElementById('photo3Input').click();">
+                            <div id="photo3Preview"
+                                style="display: none; width: 100%; height: 100%; border-radius: 8px; background-size: cover; background-position: center;">
+                            </div>
+                            <div id="photo3Placeholder" style="text-align: center; color: #00bcd4;">
+                                <i class="fas fa-plus"
+                                    style="font-size: 24px; margin-bottom: 10px; display: block;"></i>
+                                <span style="font-size: 12px;">Upload Photo 3</span>
+                            </div>
+                        </div>
+                        <input type="file" id="photo3Input" accept="image/*" style="display: none;"
+                            onchange="handlePhotoUpload(3, this)">
+                        <input type="text" id="name3" placeholder="Designer Name"
+                            style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #00bcd4; background: rgba(255, 255, 255, 0.1); color: white; text-align: center;">
+                    </div>
+                </div>
+
+                <div style="text-align: center; margin-top: 20px;">
+                    <button onclick="saveDesignerInfo()"
+                        style="background: #00bcd4; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;">
+                        <i class="fas fa-save"></i> Save Designer Info
+                    </button>
+                    <button onclick="clearAllPhotos()"
+                        style="background: #ff5722; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; margin-left: 10px;">
+                        <i class="fas fa-trash"></i> Clear All
+                    </button>
+                </div>
+            </div>
+
+            <div class="help-section">
+                <h3><i class="fas fa-info-circle"></i> About This Tool</h3>
+                <p>The Bitcoin Forensic Analysis Tool provides interactive visualization of Bitcoin transaction networks
+                    for forensic analysis and investigation purposes.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let network;
+        let infoNodeIds = new Set();
+        let originalLabels = {};
+        let globalNodes;
+        let globalEdges;
+        let labelMode = 'original';
+        let current
+
+        /**
+         * Creates gradient color configuration for mixed-role nodes
+         * @param {boolean} isMixed - Whether the node has both sender and receiver roles
+         * @returns {Object} Color configuration object for the node
+         */
+        function createGradientColorConfig(isMixed) {
+            if (!isMixed) {
+                return null; // Return null for non-mixed nodes to use existing logic
+            }
+
+            // Mixed role: use cyan-to-red gradient to indicate both sending and receiving
+            return {
+                background: 'linear-gradient(180deg, #00bcd4 0%, #dc3545 100%)', // Cyan to red gradient
+                border: '#00bcd4', // Cyan border
+                borderWidth: 4,
+                borderDashes: [5, 5], // Dashed border to indicate mixed function
+                highlight: {
+                    background: 'linear-gradient(180deg, #00e5ff 0%, #e74c3c 100%)', // Brighter gradient for highlight
+                    border: '#00e5ff',
+                    borderWidth: 4,
+                    borderDashes: [5, 5]
+                }
+            };
+        }
+
+        /**
+         * Apply gradient styling to mixed-role nodes (placeholder function)
+         */
+        function applyGradientStyling() {
+            // This function is kept for compatibility but not needed
+            // Mixed nodes are now handled directly in the color configuration
+            console.log('Gradient styling applied via color configuration');
+        }
+
+
+
+        Chain = []; // Global variable to store current transaction chain
+        const baseNodeLabels = {};
+
+        // ✅ Transactions will be loaded from database
+        let transactions = [];
+
+        // ✅ Load transactions from database API
+        async function loadTransactions() {
+            try {
+                document.getElementById('loading').style.display = 'block';
+                const response = await fetch('api.php');
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                transactions = await response.json();
+                // Cache transactions for list view
+                window.currentTransactions = transactions;
+                console.log('Loaded transactions from database:', transactions);
+                document.getElementById('loading').style.display = 'none';
+
+                return transactions;
+            } catch (error) {
+                console.error('Error loading transactions:', error);
+                document.getElementById('loading').style.display = 'none';
+                alert('Failed to load transactions from database. Please ensure the backend server is running.');
+
+                // Fallback to sample data if database is not available
+                transactions = [
+                    { id: 'tx001', from: ['Alice'], to: ['Bob', 'Carol'], date: '2025-07-01T10:00:00Z', amount: '0.5 BTC' },
+                    { id: 'tx002', from: ['Dave', 'Eve'], to: ['Frank'], date: '2025-07-01T11:00:00Z', amount: '1.2 BTC' },
+                    { id: 'tx003', from: ['Alice'], to: ['George', 'Helen', 'Ivy'], date: '2025-07-01T12:00:00Z', amount: '2.3 BTC' },
+                    { id: 'tx004', from: ['Frank'], to: ['Jack', 'Karen'], date: '2025-07-01T13:00:00Z', amount: '0.8 BTC' },
+                    { id: 'tx005', from: ['Bob', 'George'], to: ['Alice', 'Eve'], date: '2025-07-01T14:00:00Z', amount: '1.0 BTC' },
+                    { id: 'tx006', from: ['Karen'], to: ['Dave', 'Helen'], date: '2025-07-01T15:00:00Z', amount: '0.6 BTC' }
+                ];
+                // Cache fallback transactions for list view
+                window.currentTransactions = transactions;
+                return transactions;
+            }
+        }
+
+        // ✅ Parse BTC amount
+        function parseAmount(amountStr) {
+            return parseFloat(amountStr.replace(' BTC', '').trim()) || 0;
+        }
+
+        // ✅ Get full connected chain from one TX
+        function getTransactionChain(startTx) {
+            const chain = new Set();
+            const visitedNames = new Set();
+            const queue = [startTx];
+
+            while (queue.length > 0) {
+                const tx = queue.pop();
+                if (chain.has(tx.id)) continue;
+                chain.add(tx.id);
+
+                const allNames = [...tx.from, ...tx.to];
+                allNames.forEach(name => visitedNames.add(name));
+
+                transactions.forEach(nextTx => {
+                    if (!chain.has(nextTx.id)) {
+                        const nextNames = [...nextTx.from, ...nextTx.to];
+                        if (nextNames.some(n => visitedNames.has(n))) {
+                            queue.push(nextTx);
+                        }
+                    }
+                });
+            }
+            return transactions.filter(tx => chain.has(tx.id));
+        }
+
+        // ✅ Draw graph for only the given set of transactions
+        function drawGraph(chainData) {
+            currentChain = chainData; // Store globally for popup access
+            document.getElementById('graph').style.display = 'block';
+            const nodesArr = [];
+            const edgesArr = [];
+            const addedTxIds = new Set();
+            const addedAddresses = new Set();
+
+            // Extract all unique wallet addresses from transactions
+            const walletAddresses = new Set();
+
+            chainData.forEach(tx => {
+                // Add all FROM addresses
+                if (Array.isArray(tx.from)) {
+                    tx.from.forEach(address => {
+                        if (address && address.trim()) {
+                            walletAddresses.add(address.trim());
+                        }
+                    });
+                }
+
+                // Add all TO addresses
+                if (Array.isArray(tx.to)) {
+                    tx.to.forEach(address => {
+                        if (address && address.trim()) {
+                            walletAddresses.add(address.trim());
+                        }
+                    });
+                }
+            });
+
+            // Create wallet address nodes with role-based coloring
+            walletAddresses.forEach(address => {
+                // Determine the role of this wallet address
+                let isSender = false;
+                let isReceiver = false;
+
+                chainData.forEach(tx => {
+                    if (Array.isArray(tx.from) && tx.from.some(addr => addr.trim() === address)) {
+                        isSender = true;
+                    }
+                    if (Array.isArray(tx.to) && tx.to.some(addr => addr.trim() === address)) {
+                        isReceiver = true;
+                    }
+                });
+
+                // Determine color based on role
+                let nodeColor;
+                const isMixed = isSender && isReceiver;
+
+                // Use gradient configuration function for mixed nodes
+                const gradientConfig = createGradientColorConfig(isMixed);
+
+                if (gradientConfig) {
+                    // Mixed role: use gradient configuration
+                    nodeColor = gradientConfig;
+                } else if (isSender) {
+                    // Sender only: cyan
+                    nodeColor = {
+                        background: '#00bcd4',
+                        border: '#00796b',
+                        highlight: {
+                            background: '#00e5ff',
+                            border: '#00bcd4'
+                        }
+                    };
+                } else {
+                    // Receiver only: red
+                    nodeColor = {
+                        background: '#dc3545',
+                        border: '#c82333',
+                        highlight: {
+                            background: '#e74c3c',
+                            border: '#a71e2a'
+                        }
+                    };
+                }
+
+                const nodeConfig = {
+                    id: address,
+                    label: address.length > 20 ? address.substring(0, 20) + '...' : address,
+                    shape: 'box',
+                    size: 50,
+                    font: { size: 12, color: '#fff', multi: false },
+                    color: nodeColor
+                };
+
+                // Add border properties for mixed nodes
+                if (nodeColor.borderWidth) {
+                    nodeConfig.borderWidth = nodeColor.borderWidth;
+                }
+                if (nodeColor.borderDashes) {
+                    nodeConfig.borderDashes = nodeColor.borderDashes;
+                }
+                if (nodeColor.className) {
+                    nodeConfig.className = nodeColor.className;
+                }
+
+                nodesArr.push(nodeConfig);
+                baseNodeLabels[address] = address.length > 20 ? address.substring(0, 20) + '...' : address;
+            });
+
+            // Create direct wallet-to-wallet connections
+            chainData.forEach(tx => {
+                if (Array.isArray(tx.from) && Array.isArray(tx.to)) {
+                    tx.from.forEach(fromAddress => {
+                        tx.to.forEach(toAddress => {
+                            if (fromAddress && toAddress && fromAddress.trim() && toAddress.trim()) {
+                                const from = fromAddress.trim();
+                                const to = toAddress.trim();
+                                const edgeId = `${from}_to_${to}`;
+
+                                // Avoid duplicate edges
+                                if (!edgesArr.find(edge => edge.id === edgeId)) {
+                                    edgesArr.push({
+                                        id: edgeId,
+                                        from: from,
+                                        to: to,
+                                        label: tx.amount || '',
+                                        color: {
+                                            color: '#ff8c00',
+                                            highlight: '#ffa500'
+                                        },
+                                        width: 3,
+                                        arrows: { to: { enabled: true, scaleFactor: 1.5 } },
+                                        dashes: [5, 5],
+                                        font: { size: 10, color: '#fff', strokeWidth: 2, strokeColor: '#000' },
+                                        smooth: { enabled: true, type: 'curvedCW', roundness: 0.3 }
+                                    });
+                                }
+                            }
+                        });
+                    });
+                }
+            });
+
+            globalNodes = new vis.DataSet(nodesArr);
+            globalEdges = new vis.DataSet(edgesArr);
+            const data = { nodes: globalNodes, edges: globalEdges };
+
+            const options = {
+                layout: { improvedLayout: true },
+                physics: {
+                    enabled: false
+                },
+                edges: {
+                    smooth: { enabled: true, type: 'curvedCW', roundness: 0.2 },
+                    hoverWidth: 12,
+                    color: {
+                        color: '#ff8c00',
+                        highlight: '#ffa500'
+                    },
+                    dashes: [5, 5],
+                    arrows: { to: { enabled: true, scaleFactor: 1.2 } }
+                },
+                interaction: {
+                    dragNodes: true,
+                    dragView: true,
+                    zoomView: true,
+                    selectable: true,
+                    hover: true,
+                    hoverConnectedEdges: false
+                },
+                nodes: { physics: false }
+            };
+
+            if (network) {
+                network.destroy();
+                network = null;
+            }
+
+            network = new vis.Network(document.getElementById('graph'), data, options);
+
+            // ✅ Save original labels for later restore
+            network.body.data.nodes.get().forEach(node => {
+                originalLabels[node.id] = node.label;
+            });
+
+            // ✅ EDGE MIDPOINT INFO POPUPS
+            let midpointCounts = {};
+            function getOffsetForMidpoint(midX, midY) {
+                const key = midX.toFixed(1) + ',' + midY.toFixed(1);
+                midpointCounts[key] = (midpointCounts[key] || 0) + 1;
+                return (midpointCounts[key] - 1) * 12;
+            }
+
+            function updateInfoTables() {
+                const scale = network.getScale();
+                if (scale > 1.2) addInfoTables();
+                else removeInfoTables();
+            }
+
+            function addInfoTables() {
+                if (infoNodeIds.size > 0) return;
+                const edges = network.body.data.edges.get();
+                const positions = network.getPositions();
+
+                edges.forEach(edge => {
+                    // Find transaction data that connects these two wallet addresses
+                    const fromWallet = edge.from;
+                    const toWallet = edge.to;
+
+                    // Find the transaction that connects these wallets
+                    const tx = currentChain.find(t => {
+                        const hasFromWallet = Array.isArray(t.from) && t.from.some(addr => addr.trim() === fromWallet);
+                        const hasToWallet = Array.isArray(t.to) && t.to.some(addr => addr.trim() === toWallet);
+                        return hasFromWallet && hasToWallet;
+                    });
+
+                    if (!tx) return;
+
+                    const from = positions[edge.from];
+                    const to = positions[edge.to];
+                    if (!from || !to) return;
+
+                    // Position popup exactly at edge center
+                    const midX = (from.x + to.x) / 2;
+                    const midY = (from.y + to.y) / 2;
+
+                    // Create edge information with hash IDs, amount, date and time
+                    const fromHashId = tx.id; // Transaction hash ID
+                    const toHashId = tx.id;   // Same transaction hash ID
+
+                    // Format amount and date/time
+                    const amount = tx.total_output || tx.amount || 'N/A';
+                    const dateTime = tx.date || 'N/A';
+
+                    const infoId = 'info_' + edge.id;
+                    const labelText = `<b>From Hash:</b> ${fromHashId}\n<b>To Hash:</b> ${toHashId}\n<b>Amount:</b> ${amount}\n<b>Date & Time:</b> ${dateTime}`;
+
+                    network.body.data.nodes.add({
+                        id: infoId,
+                        x: midX,
+                        y: midY,
+                        label: labelText,
+                        shape: 'box',
+                        font: {
+                            size: 8,
+                            multi: 'html',
+                            face: 'monospace',
+                            color: '#ffffff',
+                            align: 'left'
+                        },
+                        color: {
+                            background: 'rgba(18, 31, 47, 0.9)',
+                            border: '#00bcd4',
+                            highlight: { background: 'rgba(18, 31, 47, 0.95)', border: '#00e5ff' }
+                        },
+                        widthConstraint: { maximum: 250, minimum: 150 },
+                        heightConstraint: { minimum: 40 },
+                        margin: { top: 3, right: 4, bottom: 3, left: 4 },
+                        physics: false,
+                        fixed: { x: false, y: false }
+                    });
+
+                    infoNodeIds.add(infoId);
+                });
+            }
+
+            function removeInfoTables() {
+                infoNodeIds.forEach(id => {
+                    network.body.data.nodes.remove(id);
+                });
+                infoNodeIds.clear();
+
+                currentChain.forEach(tx => {
+                    tx.from.forEach(src => {
+                        tx.to.forEach(dest => {
+                            const edgeId = tx.id + '-' + src + '-' + dest;
+                            network.body.data.edges.update({
+                                id: edgeId,
+                                arrows: { to: { enabled: true, scaleFactor: 1.2 } }
+                            });
+                        });
+                    });
+                });
+            }
+
+            // ✅ Update node labels based on zoom level
+            function updateNodeLabels() {
+                if (!network) return;
+
+                const scale = network.getScale();
+                const nodes = network.body.data.nodes;
+
+                if (scale > 1.2 && labelMode !== 'info') {
+                    nodes.get().forEach(node => {
+                        if (node.id.startsWith('info_')) return;
+
+                        // Find the transaction for this node
+                        const tx = transactions.find(t => t.id === node.id);
+                        if (!tx) return;
+
+                        // Show transaction details on zoom
+                        const infoLabel = `<b>${tx.id}</b>\n<b>From:</b> ${tx.from.join(', ')}\n<b>To:</b> ${tx.to.join(', ')}\n<b>Amount:</b> ${tx.amount}\n<b>Date:</b> ${tx.date}`;
+
+                        nodes.update({
+                            id: node.id,
+                            label: infoLabel,
+                            font: { size: 8, multi: 'html', face: 'monospace', color: '#ffffff' }
+                        });
+                    });
+                    labelMode = 'info';
+
+                } else if (scale <= 1.2 && labelMode !== 'original') {
+                    nodes.get().forEach(node => {
+                        if (node.id.startsWith('info_')) return;
+
+                        nodes.update({
+                            id: node.id,
+                            label: baseNodeLabels[node.id],
+                            font: { size: 12, color: '#ffffff', multi: 'html', face: 'inter' }
+                        });
+                    });
+                    labelMode = 'original';
+                }
+            }
+
+            // ✅ Node click → show custom dialog
+            network.on("click", params => {
+                if (!params.nodes.length) return;
+
+                const clickedNode = params.nodes[0];
+                if (clickedNode.startsWith("info_")) return;
+
+                showCustomDialog(params.pointer.DOM.x, params.pointer.DOM.y, clickedNode);
+            });
+
+            // ✅ Double-click handler: copy node text or recenter graph
+            network.on("doubleClick", params => {
+                if (params.nodes.length > 0) {
+                    // Double-click on node: copy node text
+                    const clickedNode = params.nodes[0];
+                    if (!clickedNode.startsWith("info_")) {
+                        copyToClipboard(clickedNode);
+                        showCopyNotification("Node ID copied to clipboard!");
+                    }
+                } else {
+                    // Double-click on empty space: recenter graph
+                    network.fit({
+                        animation: {
+                            duration: 500,
+                            easingFunction: 'easeInOutQuad'
+                        }
+                    });
+                }
+            });
+
+            // ✅ Zoom: update UI
+            network.on('zoom', () => {
+                updateInfoTables();
+                updateNodeLabels();
+            });
+
+            // ✅ Optimized popup position update with throttling
+            let updateTimeout = null;
+            function updatePopupPositions() {
+                if (infoNodeIds.size === 0) return;
+
+                // Throttle updates to prevent excessive calls
+                if (updateTimeout) return;
+
+                updateTimeout = setTimeout(() => {
+                    try {
+                        const edges = network.body.data.edges.get();
+                        const positions = network.getPositions();
+
+                        // Batch update for better performance
+                        const updates = [];
+
+                        edges.forEach(edge => {
+                            const infoId = 'info_' + edge.id;
+                            if (!infoNodeIds.has(infoId)) return;
+
+                            const from = positions[edge.from];
+                            const to = positions[edge.to];
+                            if (!from || !to) return;
+
+                            // Calculate precise edge center
+                            const midX = (from.x + to.x) / 2;
+                            const midY = (from.y + to.y) / 2;
+
+                            // Add to batch update
+                            updates.push({
+                                id: infoId,
+                                x: midX,
+                                y: midY,
+                                physics: false,
+                                fixed: { x: false, y: false }
+                            });
+                        });
+
+                        // Perform batch update for better performance
+                        if (updates.length > 0) {
+                            network.body.data.nodes.update(updates);
+                        }
+                    } catch (error) {
+                        console.error('Error updating popup positions:', error);
+                    }
+
+                    updateTimeout = null;
+                }, 16); // Limit to ~60fps
+            }
+
+
+            // ✅ Simplified drag interactions (performance optimized)
+            let isDragging = false;
+
+            network.on('dragStart', (params) => {
+                network.canvas.body.container.style.cursor = 'grabbing';
+                isDragging = true;
+            });
+
+            network.on('dragEnd', (params) => {
+                network.canvas.body.container.style.cursor = 'grab';
+                isDragging = false;
+
+                // Single update after drag ends
+                if (infoNodeIds.size > 0) {
+                    setTimeout(() => updatePopupPositions(), 50);
+                }
+            });
+
+            // ✅ Minimal event listeners for better performance
+            network.on('stabilizationIterationsDone', () => {
+                if (infoNodeIds.size > 0) {
+                    updatePopupPositions();
+                }
+            });
+            network.on('hoverEdge', () => {
+                network.canvas.body.container.style.cursor = 'pointer';
+            });
+            network.on('blurEdge', () => {
+                network.canvas.body.container.style.cursor = 'grab';
+            });
+
+            // ✅ Initial setup with enhanced centering
+            network.once('stabilizationIterationsDone', () => {
+                // Fit and center the graph with animation
+                network.fit({
+                    animation: {
+                        duration: 1000,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+                updateInfoTables();
+                updateNodeLabels();
+            });
+
+            // ✅ Additional centering after stabilization to ensure proper positioning
+            setTimeout(() => {
+                if (network) {
+                    network.fit({
+                        animation: {
+                            duration: 500,
+                            easingFunction: 'easeInOutQuad'
+                        }
+                    });
+                }
+            }, 2000);
+
+
+
+            // ✅ Add keyboard shortcut to center graph (Space key)
+            document.addEventListener('keydown', function (event) {
+                if (event.code === 'Space' && !event.target.matches('input')) {
+                    event.preventDefault();
+                    if (network) {
+                        network.fit({
+                            animation: {
+                                duration: 500,
+                                easingFunction: 'easeInOutQuad'
+                            }
+                        });
+                    }
+                }
+            });
+        }
+
+        // ✅ Filter to show transaction chain (input and output transactions)
+        function filterGraphForNode(txId) {
+            if (!network) {
+                alert('No graph available');
+                return;
+            }
+
+            // Get all current nodes and edges from the main graph
+            const currentNodes = network.body.data.nodes.get();
+            const currentEdges = network.body.data.edges.get();
+
+            // Find the selected transaction node
+            const selectedNode = currentNodes.find(node => node.id === txId);
+            if (!selectedNode) {
+                alert('Transaction not found in current graph');
+                return;
+            }
+
+            document.getElementById('graph').style.display = 'block';
+            const nodesArr = [];
+            const edgesArr = [];
+
+            // Add the main transaction node (selected node)
+            nodesArr.push({
+                id: selectedNode.id,
+                label: selectedNode.label,
+                shape: selectedNode.shape,
+                size: selectedNode.size,
+                font: selectedNode.font,
+                color: selectedNode.color
+            });
+
+            // Find all nodes connected to the selected transaction from the main graph
+            const connectedNodeIds = new Set();
+            const inputNodes = [];
+            const outputNodes = [];
+
+            currentEdges.forEach(edge => {
+                if (edge.from === txId) {
+                    // This is an output connection (transaction → other node)
+                    connectedNodeIds.add(edge.to);
+                    outputNodes.push(edge.to);
+                } else if (edge.to === txId) {
+                    // This is an input connection (other node → transaction)
+                    connectedNodeIds.add(edge.from);
+                    inputNodes.push(edge.from);
+                }
+            });
+
+            // Add all connected nodes with proper coloring
+            currentNodes.forEach(node => {
+                if (connectedNodeIds.has(node.id)) {
+                    const isInput = inputNodes.includes(node.id);
+                    const isOutput = outputNodes.includes(node.id);
+
+                    nodesArr.push({
+                        id: node.id,
+                        label: node.label,
+                        shape: 'box',
+                        size: 30,
+                        font: { size: 10, color: '#fff' },
+                        color: {
+                            background: isInput ? '#ff5722' : '#4caf50', // Red for inputs, Green for outputs
+                            border: isInput ? '#d32f2f' : '#388e3c'
+                        },
+                        title: isInput ? `Input: ${node.id}` : `Output: ${node.id}`
+                    });
+                }
+            });
+
+            // Add all edges connected to the selected transaction
+            currentEdges.forEach(edge => {
+                if (edge.from === txId || edge.to === txId) {
+                    const isInput = edge.to === txId;
+
+                    edgesArr.push({
+                        id: edge.id,
+                        from: edge.from,
+                        to: edge.to,
+                        title: edge.title,
+                        width: 2,
+                        arrows: { to: { enabled: true, scaleFactor: 1.2 } },
+                        dashes: [5, 5],
+                        color: {
+                            color: '#ff8c00', // Orange color for all arrows
+                            highlight: '#ffa500'
+                        }
+                    });
+                }
+            });
+
+            // Allow all nodes to be draggable (same as main graph)
+            // Remove the fixed positioning to enable free movement
+
+            // Create the network
+            globalNodes = new vis.DataSet(nodesArr);
+            globalEdges = new vis.DataSet(edgesArr);
+            const data = { nodes: globalNodes, edges: globalEdges };
+
+            const options = {
+                layout: { improvedLayout: true },
+                physics: {
+                    enabled: true,
+                    stabilization: { iterations: 100 },
+                    barnesHut: {
+                        gravitationalConstant: -2000,
+                        centralGravity: 0.3,
+                        springLength: 95,
+                        springConstant: 0.04,
+                        damping: 0.09
+                    }
+                },
+                edges: {
+                    smooth: { enabled: true, type: 'curvedCW', roundness: 0.2 },
+                    color: {
+                        color: '#ff8c00',
+                        highlight: '#ffa500'
+                    },
+                    dashes: [5, 5],
+                    arrows: { to: { enabled: true, scaleFactor: 1.2 } }
+                },
+                interaction: {
+                    dragNodes: true,
+                    dragView: true,
+                    zoomView: true,
+                    selectable: true
+                }
+            };
+
+            if (network) {
+                network.destroy();
+                network = null;
+            }
+
+            network = new vis.Network(document.getElementById('graph'), data, options);
+
+            // Removed selective dragging - all nodes now freely draggable like main graph
+
+            // Fit and center the view
+            network.once('stabilizationIterationsDone', () => {
+                network.fit();
+            });
+
+            // Handle zoom events to ensure proper view adjustment
+            network.on('zoom', function (params) {
+                // Allow the network to handle zoom properly
+                console.log('Zoom level:', params.scale);
+            });
+
+            // Add double-click to fit view
+            network.on('doubleClick', function (params) {
+                network.fit({
+                    animation: {
+                        duration: 500,
+                        easingFunction: 'easeInOutQuad'
+                    }
+                });
+            });
+
+            console.log(`Show Only: ${txId} with ${inputNodes.length} inputs and ${outputNodes.length} outputs`);
+        }
+
+        // ✅ Custom dialog functions
+        let currentClickedNode = null;
+
+        function showCustomDialog(x, y, nodeId) {
+            console.log('showCustomDialog called with:', x, y, nodeId);
+            currentClickedNode = nodeId;
+            const dialog = document.getElementById('customDialog');
+            const content = document.getElementById('dialogContent');
+
+            if (!dialog) {
+                console.error('Dialog element not found!');
+                return;
+            }
+
+            // Find transaction details
+            const tx = transactions.find(t => t.id === nodeId);
+            if (tx) {
+                content.innerHTML = `
+                    <strong>Transaction: ${nodeId.substring(0, 16)}...</strong><br>
+                    <small>Amount: ${tx.amount || 'N/A'}</small><br>
+                    <small>Date: ${tx.date || 'N/A'}</small>
+                `;
+            } else {
+                content.innerHTML = `<strong>Transaction: ${nodeId.substring(0, 16)}...</strong>`;
+            }
+
+            // Position dialog near the click point (ensure it's visible)
+            const maxX = window.innerWidth - 200; // Dialog width buffer
+            const maxY = window.innerHeight - 150; // Dialog height buffer
+
+            dialog.style.left = Math.min(x + 10, maxX) + 'px';
+            dialog.style.top = Math.min(y + 10, maxY) + 'px';
+            dialog.style.display = 'block';
+            dialog.style.zIndex = '2000'; // Ensure it's on top
+
+            console.log('Dialog positioned at:', dialog.style.left, dialog.style.top);
+
+            // Hide dialog when clicking elsewhere
+            setTimeout(() => {
+                document.addEventListener('click', hideDialogOnClickOutside, true);
+            }, 100);
+        }
+
+        function handleDialogAction(action) {
+            if (!currentClickedNode) return;
+
+            hideCustomDialog();
+
+            if (action === 'list') {
+                // Extract actual transaction ID from node ID
+                let actualTxId = currentClickedNode;
+
+                // Remove prefixes like "input_", "output_", and suffixes like "_0", "_1"
+                if (actualTxId.startsWith('input_') || actualTxId.startsWith('output_')) {
+                    // Extract transaction ID from node ID format: "input_TXID_INDEX" or "output_TXID_INDEX"
+                    const parts = actualTxId.split('_');
+                    if (parts.length >= 3) {
+                        // Remove first part (input/output) and last part (index), keep middle parts as transaction ID
+                        actualTxId = parts.slice(1, -1).join('_');
+                    }
+                }
+
+                console.log('Original node ID:', currentClickedNode);
+                console.log('Extracted transaction ID:', actualTxId);
+
+                // Open the transaction list page with actual transaction ID
+                window.open(`transaction-list.html?txid=${encodeURIComponent(actualTxId)}`, "_blank");
+            } else if (action === 'show-only') {
+                // Show only this node and its connections
+                filterGraphForNode(currentClickedNode);
+            }
+
+            currentClickedNode = null;
+        }
+
+        function hideCustomDialog() {
+            const dialog = document.getElementById('customDialog');
+            dialog.style.display = 'none';
+            document.removeEventListener('click', hideDialogOnClickOutside, true);
+        }
+
+        function hideDialogOnClickOutside(event) {
+            const dialog = document.getElementById('customDialog');
+            if (!dialog.contains(event.target)) {
+                hideCustomDialog();
+            }
+        }
+
+        // ✅ Fixed Print graph function
+        function printGraphInfo() {
+            if (!network) {
+                alert('No graph data available. Please search for a transaction first.');
+                return;
+            }
+
+            // Hide any popup dialogs before printing
+            const customDialog = document.getElementById('customDialog');
+            if (customDialog) {
+                customDialog.style.display = 'none';
+            }
+
+            // Get the canvas element
+            const canvas = document.querySelector('#graph canvas');
+            if (!canvas) {
+                alert('Unable to capture graph for printing.');
+                return;
+            }
+
+            // Store current view state
+            const currentScale = network.getScale();
+            const currentPosition = network.getViewPosition();
+
+            // Get all nodes and remove info nodes temporarily
+            const allNodes = network.body.data.nodes.get();
+            const allEdges = network.body.data.edges.get();
+            const infoNodes = allNodes.filter(node => node.id.startsWith('info-'));
+            const regularNodes = allNodes.filter(node => !node.id.startsWith('info-'));
+
+            // Remove info nodes for clean print
+            if (infoNodes.length > 0) {
+                network.body.data.nodes.remove(infoNodes.map(n => n.id));
+            }
+
+            // Fit the graph to show all nodes
+            network.fit({
+                animation: false
+            });
+
+            // Wait for the network to stabilize, then capture
+            setTimeout(() => {
+                // Capture the current canvas
+                const graphDataURL = canvas.toDataURL('image/png', 1.0);
+
+                // Create simple print window
+                const printWindow = window.open('', '_blank', 'width=800,height=600');
+
+                const printHTML = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Bitcoin Network Graph</title>
+                        <style>
+                            body {
+                                margin: 0;
+                                padding: 20px;
+                                font-family: Arial, sans-serif;
+                                background: white;
+                                color: black;
+                            }
+                            .header {
+                                text-align: center;
+                                margin-bottom: 20px;
+                                border-bottom: 2px solid #333;
+                                padding-bottom: 10px;
+                            }
+                            .header h1 {
+                                margin: 0;
+                                font-size: 24px;
+                                color: #333;
+                            }
+                            .header p {
+                                margin: 5px 0;
+                                font-size: 14px;
+                                color: #666;
+                            }
+                            .graph-container {
+                                text-align: center;
+                                margin: 20px 0;
+                            }
+                            .graph-image {
+                                max-width: 100%;
+                                height: auto;
+                                border: 2px solid #333;
+                                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+                            }
+                            .footer {
+                                text-align: center;
+                                margin-top: 20px;
+                                font-size: 12px;
+                                color: #666;
+                                border-top: 1px solid #ddd;
+                                padding-top: 10px;
+                            }
+                            @media print {
+                                body { margin: 0; padding: 15px; }
+                                .graph-image { 
+                                    max-width: 100%; 
+                                    page-break-inside: avoid;
+                                }
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="header">
+                            <h1>Bitcoin Wallet Network Analysis</h1>
+                            <p>Generated on: ${new Date().toLocaleString()}</p>
+                            <p>Total Wallets: ${regularNodes.length} | Total Connections: ${allEdges.length}</p>
+                        </div>
+                        <div class="graph-container">
+                            <img src="${graphDataURL}" alt="Bitcoin Network Graph" class="graph-image" />
+                        </div>
+                        <div class="footer">
+                            <p>Bitcoin Forensic Analysis Tool - Network Visualization</p>
+                        </div>
+                    </body>
+                    </html>
+                `;
+
+                printWindow.document.write(printHTML);
+                printWindow.document.close();
+
+                // Restore original view
+                network.moveTo({
+                    position: currentPosition,
+                    scale: currentScale,
+                    animation: false
+                });
+
+                // Restore info nodes
+                if (infoNodes.length > 0) {
+                    setTimeout(() => {
+                        network.body.data.nodes.add(infoNodes);
+                    }, 100);
+                }
+
+                // Auto-print after a short delay
+                setTimeout(() => {
+                    printWindow.print();
+                }, 1000);
+
+            }, 500);
+        }
+
+        // ✅ Toggle list view visibility with enhanced state management
+        function toggleListView(show) {
+            const transactionList = document.getElementById('transactionList');
+            const graph = document.getElementById('graph');
+
+            if (!transactionList || !graph) {
+                console.error('Required elements not found for view toggle');
+                return;
+            }
+
+            // Store current view state
+            window.currentView = show ? 'list' : 'graph';
+            console.log(`Switching to ${window.currentView} view`);
+
+            if (show) {
+                // Showing transaction list
+                graph.style.opacity = '0';
+
+                setTimeout(() => {
+                    graph.style.display = 'none';
+
+                    // Show transaction list with smooth transition
+                    transactionList.style.display = 'block';
+                    transactionList.style.opacity = '0';
+
+                    // Trigger reflow and fade in
+                    requestAnimationFrame(() => {
+                        transactionList.style.opacity = '1';
+
+                        // Focus management for accessibility
+                        const listTitle = document.getElementById('listTitle');
+                        if (listTitle) {
+                            listTitle.focus();
+                        }
+
+                        console.log('Transaction list view activated');
+                    });
+                }, 300);
+            } else {
+                // Showing graph view
+                transactionList.style.opacity = '0';
+
+                setTimeout(() => {
+                    transactionList.style.display = 'none';
+
+                    // Show graph with smooth transition
+                    graph.style.display = 'block';
+                    graph.style.opacity = '0';
+
+                    // Trigger reflow and fade in
+                    requestAnimationFrame(() => {
+                        graph.style.opacity = '1';
+
+                        // Ensure graph is properly interactive
+                        if (network) {
+                            try {
+                                // Re-enable graph interactions
+                                network.setOptions({ interaction: { dragNodes: true, dragView: true, zoomView: true } });
+
+                                // Focus management for accessibility
+                                const graphElement = document.getElementById('graph');
+                                if (graphElement) {
+                                    graphElement.focus();
+                                }
+
+                                console.log('Graph view activated and interactions enabled');
+                            } catch (error) {
+                                console.warn('Could not re-enable graph interactions:', error);
+                            }
+                        }
+                    });
+                }, 300);
+            }
+        }
+
+        // ✅ Fetch all transactions for current graph
+        async function fetchAllGraphTransactions() {
+            try {
+                // Show loading state
+                const loadingRow = document.getElementById('loadingRow');
+                const errorRow = document.getElementById('errorRow');
+                const tableBody = document.getElementById('transactionTableBody');
+
+                if (loadingRow) loadingRow.style.display = 'table-row';
+                if (errorRow) errorRow.style.display = 'none';
+
+                // Get all nodes from current graph
+                const nodes = network.body.data.nodes.get();
+                const edges = network.body.data.edges.get();
+
+                // Filter out info nodes and get transaction IDs
+                const transactionNodes = nodes.filter(node => !node.id.startsWith('info-'));
+                const transactionIds = transactionNodes.map(node => node.id);
+
+                console.log('Fetching transactions for graph nodes:', transactionIds.length);
+
+                // If we have transaction data from the current search, use it
+                if (window.currentTransactions && window.currentTransactions.length > 0) {
+                    console.log('Using cached transaction data:', window.currentTransactions.length);
+                    return window.currentTransactions;
+                }
+
+                // Otherwise, fetch from API using the first transaction ID as a reference
+                if (transactionIds.length > 0) {
+                    const firstTxId = transactionIds[0];
+                    console.log('Fetching transaction chain for:', firstTxId);
+
+                    const response = await fetch(`api.php?action=chain&txid=${encodeURIComponent(firstTxId)}`);
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const transactions = await response.json();
+
+                    if (transactions.error) {
+                        throw new Error(transactions.error);
+                    }
+
+                    console.log('Fetched transactions from API:', transactions.length);
+                    return transactions;
+                } else {
+                    // Fallback: fetch sample transactions
+                    console.log('No transaction IDs found, fetching sample transactions');
+                    const response = await fetch('api.php');
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const transactions = await response.json();
+
+                    if (transactions.error) {
+                        throw new Error(transactions.error);
+                    }
+
+                    return transactions;
+                }
+
+            } catch (error) {
+                console.error('Error fetching graph transactions:', error);
+
+                // Show error state
+                const loadingRow = document.getElementById('loadingRow');
+                const errorRow = document.getElementById('errorRow');
+                const errorMessage = document.getElementById('errorMessage');
+
+                if (loadingRow) loadingRow.style.display = 'none';
+                if (errorRow) errorRow.style.display = 'table-row';
+
+                // Provide specific error messages based on error type
+                let displayMessage = 'Failed to load transactions';
+                if (error.message.includes('HTTP error')) {
+                    displayMessage = 'Server connection failed. Please check if the backend is running.';
+                } else if (error.message.includes('not found')) {
+                    displayMessage = 'No transactions found for the current graph.';
+                } else if (error.message.includes('Database')) {
+                    displayMessage = 'Database error occurred while fetching transactions.';
+                } else {
+                    displayMessage = `Failed to load transactions: ${error.message}`;
+                }
+
+                if (errorMessage) errorMessage.textContent = displayMessage;
+
+                throw error;
+            }
+        }
+
+        // ✅ Render transaction data in table
+        function renderTransactionData(transactions) {
+            const tableBody = document.getElementById('transactionTableBody');
+            const loadingRow = document.getElementById('loadingRow');
+            const errorRow = document.getElementById('errorRow');
+
+            if (!tableBody) {
+                console.error('Transaction table body not found');
+                return;
+            }
+
+            // Hide loading and error states
+            if (loadingRow) loadingRow.style.display = 'none';
+            if (errorRow) errorRow.style.display = 'none';
+
+            // Clear existing data (except loading and error rows)
+            const existingRows = tableBody.querySelectorAll('tr:not(.loading-row):not(.error-row)');
+            existingRows.forEach(row => row.remove());
+
+            if (!transactions || transactions.length === 0) {
+                // Show "no transactions" message
+                const noDataRow = document.createElement('tr');
+                noDataRow.innerHTML = `
+                    <td colspan="6" style="text-align: center; color: var(--text-secondary); padding: 20px;">
+                        <i class="fas fa-info-circle"></i> No transactions found
+                    </td>
+                `;
+                tableBody.appendChild(noDataRow);
+                return;
+            }
+
+            // Sort transactions by timestamp in chronological order (oldest first for sequence)
+            const sortedTransactions = [...transactions].sort((a, b) => {
+                const dateA = new Date(a.date || 0);
+                const dateB = new Date(b.date || 0);
+                return dateA - dateB; // Oldest first for chronological sequence
+            });
+
+            console.log(`Rendering ${sortedTransactions.length} transactions in chronological sequence`);
+
+            // Create table rows for each transaction
+            sortedTransactions.forEach((tx, index) => {
+                const row = document.createElement('tr');
+                row.style.cursor = 'pointer';
+                row.title = 'Click to view transaction details';
+
+                // Add hover effect
+                row.addEventListener('mouseenter', () => {
+                    row.style.backgroundColor = 'rgba(0, 188, 212, 0.1)';
+                });
+                row.addEventListener('mouseleave', () => {
+                    row.style.backgroundColor = '';
+                });
+
+                // Show FULL transaction hash (no truncation)
+                const txHash = tx.id || 'N/A';
+
+                // Show FULL address information (no truncation)
+                const fromAddresses = formatFullAddressArray(tx.from || []);
+                const toAddresses = formatFullAddressArray(tx.to || []);
+
+                // Format amounts with fallback values
+                const amount = formatAmountDisplay(tx.amount || tx.total_output || '0');
+                const fee = formatAmountDisplay(tx.fees || '0');
+
+                // Format timestamp
+                const timestamp = formatTimestampDisplay(tx.date || 'N/A');
+
+                row.innerHTML = `
+                    <td style="font-family: monospace; font-size: 10px;">${txHash}</td>
+                    <td style="font-size: 10px;">${fromAddresses}</td>
+                    <td style="font-size: 10px;">${toAddresses}</td>
+                    <td style="text-align: right;">${amount}</td>
+                    <td style="text-align: right;">${fee}</td>
+                    <td>${timestamp}</td>
+                `;
+
+                // Add click handler for transaction details (future enhancement)
+                row.addEventListener('click', () => {
+                    console.log('Transaction clicked:', tx.id);
+                    // Future: show transaction details modal
+                });
+
+                tableBody.appendChild(row);
+            });
+
+            console.log('Transaction table rendering completed');
+        }
+
+        // ✅ Format address array for display (FULL VERSION - no truncation)
+        function formatFullAddressArray(addresses) {
+            if (!addresses || !Array.isArray(addresses) || addresses.length === 0) {
+                return '<span style="color: var(--text-secondary);">N/A</span>';
+            }
+
+            // Show all addresses in full, separated by line breaks
+            const fullAddresses = addresses.map(addr => {
+                if (!addr) return 'N/A';
+                return `<div style="margin: 2px 0; font-family: monospace;">${addr}</div>`;
+            }).join('');
+
+            return fullAddresses;
+        }
+
+        // ✅ Format address array for display (LEGACY - kept for compatibility)
+        function formatAddressArray(addresses) {
+            if (!addresses || !Array.isArray(addresses) || addresses.length === 0) {
+                return '<span style="color: var(--text-secondary);">N/A</span>';
+            }
+
+            // If single address, show truncated version
+            if (addresses.length === 1) {
+                const addr = addresses[0];
+                if (addr && addr.length > 16) {
+                    return `${addr.substring(0, 8)}...${addr.substring(addr.length - 8)}`;
+                }
+                return addr || 'N/A';
+            }
+
+            // If multiple addresses, show count and first address
+            const firstAddr = addresses[0];
+            const truncatedFirst = firstAddr && firstAddr.length > 12
+                ? `${firstAddr.substring(0, 6)}...${firstAddr.substring(firstAddr.length - 6)}`
+                : firstAddr;
+
+            return `${truncatedFirst} <span style="color: var(--text-secondary);">(+${addresses.length - 1} more)</span>`;
+        }
+
+        // ✅ Format amount for display
+        function formatAmountDisplay(amount) {
+            if (!amount || amount === 'N/A') return '0.0000000';
+
+            // If already formatted (contains 'BTC'), return as is
+            if (typeof amount === 'string' && amount.includes('BTC')) {
+                return amount;
+            }
+
+            // Convert to number and format
+            const numAmount = parseFloat(amount);
+            if (isNaN(numAmount)) return '0.0000000';
+
+            return numAmount.toFixed(7);
+        }
+
+
+
+        // ✅ Format timestamp for display
+        function formatTimestampDisplay(timestamp) {
+            if (!timestamp || timestamp === 'N/A') return 'N/A';
+
+            try {
+                const date = new Date(timestamp);
+                if (isNaN(date.getTime())) return timestamp;
+
+                // Format as YYYY-MM-DD HH:MM
+                return date.toLocaleString('en-CA', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                }).replace(',', '');
+            } catch (error) {
+                console.warn('Error formatting timestamp:', timestamp, error);
+                return timestamp;
+            }
+        }
+
+        // ✅ Show all transactions list
+        async function showAllTransactionsList() {
+            if (!network) {
+                alert('No graph data available. Please search for a transaction first.');
+                return;
+            }
+
+            // Use toggle function to show list
+            toggleListView(true);
+
+            try {
+                // Fetch and load transaction data
+                const transactions = await fetchAllGraphTransactions();
+                console.log('Successfully loaded transactions for list view:', transactions.length);
+
+                // Store transactions for potential use by other functions
+                window.listTransactions = transactions;
+
+                // Update list title with time filter info if active
+                updateListTitle();
+
+                // Render the transaction data in the table
+                renderTransactionData(transactions);
+
+
+
+            } catch (error) {
+                console.error('Failed to load transactions for list view:', error);
+
+                // Show user-friendly error message
+                const errorMessage = error.message.includes('HTTP error')
+                    ? 'Unable to connect to the server. Please check your connection and try again.'
+                    : 'Failed to load transaction data. Please try again.';
+
+                // Could show a toast notification here instead of alert
+                console.warn('Transaction loading failed:', errorMessage);
+            }
+        }
+
+
+
+        // ✅ Time Filter Functions
+        let currentSearchId = null;
+
+        function showTimeFilterButton() {
+            const timeFilterBtn = document.getElementById('timeFilterBtn');
+            if (timeFilterBtn) {
+                timeFilterBtn.style.display = 'inline-block';
+            }
+        }
+
+        function hideTimeFilterButton() {
+            const timeFilterBtn = document.getElementById('timeFilterBtn');
+            if (timeFilterBtn) {
+                timeFilterBtn.style.display = 'none';
+            }
+        }
+
+        function showTimeFilter() {
+            console.log('🕒 Opening time filter overlay');
+            const overlay = document.getElementById('timeFilter');
+            if (overlay) {
+                overlay.style.display = 'flex';
+                // Clear previous values
+                const walletInput = document.getElementById('walletAddress');
+                const startInput = document.getElementById('startTime');
+                const endInput = document.getElementById('endTime');
+
+                if (walletInput) walletInput.value = currentSearchId || '';
+                if (startInput) startInput.value = '';
+                if (endInput) endInput.value = '';
+
+                // Hide View Type section initially
+                hideViewTypeOptions();
+                
+                hideTimeFilterError();
+            }
+        }
+
+        function hideTimeFilter() {
+            const overlay = document.getElementById('timeFilter');
+            if (overlay) {
+                overlay.style.display = 'none';
+            }
+        }
+
+        function showTimeFilterError(message) {
+            const errorDiv = document.getElementById('timeFilterError');
+            if (errorDiv) {
+                errorDiv.textContent = message;
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        function hideTimeFilterError() {
+            const errorDiv = document.getElementById('timeFilterError');
+            if (errorDiv) {
+                errorDiv.style.display = 'none';
+            }
+        }
+
+        // ✅ View Type Functions
+        function showViewTypeOptions() {
+            const viewTypeSection = document.getElementById('viewTypeSection');
+            if (viewTypeSection) {
+                viewTypeSection.style.display = 'block';
+                // Reset to default selection (List)
+                const listRadio = document.getElementById('viewTypeList');
+                if (listRadio) {
+                    listRadio.checked = true;
+                }
+            }
+        }
+
+        function hideViewTypeOptions() {
+            const viewTypeSection = document.getElementById('viewTypeSection');
+            if (viewTypeSection) {
+                viewTypeSection.style.display = 'none';
+            }
+        }
+
+        function checkBothDatesProvided() {
+            const startTime = document.getElementById('startTime').value.trim();
+            const endTime = document.getElementById('endTime').value.trim();
+            
+            if (startTime) {
+                showViewTypeOptions();
+            } else {
+                hideViewTypeOptions();
+            }
+        }
+
+        function getSelectedViewType() {
+            const listRadio = document.getElementById('viewTypeList');
+            const graphRadio = document.getElementById('viewTypeGraph');
+            
+            if (graphRadio && graphRadio.checked) {
+                return 'graph';
+            }
+            return 'list'; // default
+        }
+
+        async function applyTimeFilter() {
+            const walletAddress = document.getElementById('walletAddress').value.trim();
+            const startTime = document.getElementById('startTime').value.trim();
+            const endTime = document.getElementById('endTime').value.trim();
+            const viewType = getSelectedViewType();
+
+            if (!walletAddress || !startTime) {
+                showTimeFilterError('Please fill in wallet address and start time (end time is optional)');
+                return;
+            }
+
+            try {
+                console.log('🕒 Applying time filter:', { walletAddress, startTime, endTime, viewType });
+
+                // Call API with time filtering (end time is optional)
+                let apiUrl = `api.php?action=wallet&address=${encodeURIComponent(walletAddress)}&start_time=${encodeURIComponent(startTime)}`;
+                if (endTime) {
+                    apiUrl += `&end_time=${encodeURIComponent(endTime)}`;
+                }
+                console.log('🔗 API URL:', apiUrl);
+                const response = await fetch(apiUrl);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                if (!data || data.length === 0) {
+                    const timeRangeText = endTime ? `from ${startTime} to ${endTime}` : `from ${startTime} to present`;
+                    showTimeFilterError(`No transactions found for wallet address: ${walletAddress} ${timeRangeText}`);
+                    return;
+                }
+
+                // Hide the filter overlay
+                hideTimeFilter();
+
+                // Route to appropriate view based on selection
+                if (viewType === 'graph' && startTime) {
+                    // Show graph view when graph is selected and start time is provided
+                    console.log('📊 Displaying filtered transactions as graph');
+                    renderGraphView(data, walletAddress, startTime, endTime);
+                } else {
+                    // Show list view (default or when List is selected)
+                    console.log('📋 Displaying filtered transactions as list');
+                    renderListView(data, walletAddress, startTime, endTime);
+                }
+
+            } catch (error) {
+                console.error('Error applying time filter:', error);
+                
+                // Check if the error is about no transactions found
+                if (error.message && error.message.includes('No transactions found')) {
+                    const timeRangeText = endTime ? `from ${startTime} to ${endTime}` : `from ${startTime} to present`;
+                    showTimeFilterError(`No transactions found for this wallet address during the specified time period (${timeRangeText})`);
+                } else {
+                    showTimeFilterError('Error loading filtered transactions: ' + error.message);
+                }
+            }
+        }
+
+        function openTimeFilterResults(transactions, walletAddress, startTime, endTime) {
+            // Create a new window/page for results
+            const newWindow = window.open('', '_blank', 'width=1200,height=800,scrollbars=yes,resizable=yes');
+
+            const html = `
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Time Filter Results</title>
+                    <style>
+                        body {
+                            font-family: 'Inter', sans-serif;
+                            margin: 20px;
+                            background: #000;
+                            color: white;
+                        }
+                        .header {
+                            margin-bottom: 20px;
+                            padding: 20px;
+                            background: rgba(18, 31, 47, 0.9);
+                            border: 2px solid #00bcd4;
+                            border-radius: 8px;
+                        }
+                        .header h1 {
+                            color: #00bcd4;
+                            margin: 0 0 10px 0;
+                        }
+                        .filter-info {
+                            color: #ccc;
+                            font-size: 14px;
+                        }
+                        table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            background: rgba(18, 31, 47, 0.9);
+                            border: 1px solid #333;
+                            margin-top: 10px;
+                        }
+                        th, td {
+                            padding: 12px;
+                            text-align: left;
+                            border: 1px solid #333;
+                            word-wrap: break-word;
+                            vertical-align: top;
+                        }
+                        th {
+                            background: #00bcd4;
+                            color: white;
+                            font-weight: bold;
+                            position: sticky;
+                            top: 0;
+                        }
+                        /* Column widths */
+                        th:nth-child(1), td:nth-child(1) { width: 25%; } /* Wallet Address (Sender) */
+                        th:nth-child(2), td:nth-child(2) { width: 25%; } /* Receiver Address */
+                        th:nth-child(3), td:nth-child(3) { width: 15%; } /* Date & Time */
+                        th:nth-child(4), td:nth-child(4) { width: 10%; } /* Amount */
+                        th:nth-child(5), td:nth-child(5) { width: 25%; } /* Transaction Hash */
+                        
+                        tr:nth-child(even) {
+                            background: rgba(0, 188, 212, 0.1);
+                        }
+                        tr:hover {
+                            background: rgba(0, 188, 212, 0.2);
+                        }
+                        .hash {
+                            font-family: monospace;
+                            font-size: 12px;
+                            word-break: break-all;
+                            color: #00e5ff;
+                        }
+                        .address {
+                            font-family: monospace;
+                            font-size: 11px;
+                            word-break: break-all;
+                            color: #ffffff;
+                        }
+                        /* Highlight the searched wallet address */
+                        .sender-highlight {
+                            background-color: rgba(255, 193, 7, 0.2);
+                            font-weight: bold;
+                        }
+                        .print-btn {
+                            margin: 10px 0;
+                            padding: 10px 20px;
+                            background: #00bcd4;
+                            color: white;
+                            border: none;
+                            border-radius: 4px;
+                            cursor: pointer;
+                        }
+                        .print-btn:hover {
+                            background: #0097a7;
+                        }
+                        @media print {
+                            .print-btn { display: none; }
+                            body { background: white; color: black; }
+                            .header { background: white; border: 1px solid #000; }
+                            .header h1 { color: #000; }
+                            table { background: white; }
+                            th { background: #f0f0f0; color: black; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>Time Filter Results</h1>
+                        <div class="filter-info">
+                            <strong>Wallet Address:</strong> ${walletAddress}<br>
+                            <strong>Time Range:</strong> ${startTime} to ${endTime || 'Present'}<br>
+                            <strong>Total Transactions:</strong> ${transactions.length}
+                        </div>
+                        <button class="print-btn" onclick="window.print()">🖨️ Print Results</button>
+                    </div>
+                    
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Wallet Address (Sender)</th>
+                                <th>Receiver Address</th>
+                                <th>Date & Time of Transaction</th>
+                                <th>Transaction Amount</th>
+                                <th>Transaction Hash</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${transactions.map(tx => {
+                // Simple display - show all transactions with from/to addresses
+                const fromAddresses = Array.isArray(tx.from) ? tx.from : [tx.from || 'N/A'];
+                const toAddresses = Array.isArray(tx.to) ? tx.to : [tx.to || 'N/A'];
+
+                // Create rows for each from-to combination
+                let rows = '';
+                fromAddresses.forEach(fromAddr => {
+                    toAddresses.forEach(toAddr => {
+                        rows += `
+                                            <tr>
+                                                <td class="address">${fromAddr}</td>
+                                                <td class="address">${toAddr}</td>
+                                                <td>${tx.date || 'N/A'}</td>
+                                                <td>${tx.amount || 'N/A'}</td>
+                                                <td class="hash">${tx.id || 'N/A'}</td>
+                                            </tr>
+                                        `;
+                    });
+                });
+
+                return rows;
+            }).join('')}
+                        </tbody>
+                    </table>
+                </body>
+                </html>
+            `;
+
+            newWindow.document.write(html);
+            newWindow.document.close();
+        }
+
+        // ✅ View Rendering Functions
+        function renderListView(transactions, walletAddress, startTime, endTime) {
+            console.log('📋 Rendering list view for filtered transactions');
+            
+            // Store the filtered transactions
+            window.listTransactions = transactions;
+            window.timeFilterInfo = { walletAddress, startTime, endTime };
+            
+            // Show the transaction list
+            toggleListView(true);
+            
+            // Update the list title to show filter info
+            updateListTitle();
+            
+            // Render the transaction data in the table
+            renderTransactionData(transactions);
+            
+            // Show time filter status
+            const timeRangeText = endTime ? `${startTime} to ${endTime}` : `${startTime} to present`;
+            showTimeFilterStatus(startTime, endTime || 'Present', transactions.length);
+        }
+
+        function renderGraphView(transactions, walletAddress, startTime, endTime) {
+            console.log('📊 Rendering graph view for filtered transactions');
+            
+            // Hide transaction list if visible
+            const transactionList = document.getElementById('transactionList');
+            if (transactionList) {
+                transactionList.style.display = 'none';
+            }
+            
+            // Show the graph container
+            const graphContainer = document.getElementById('graph');
+            if (graphContainer) {
+                graphContainer.style.display = 'block';
+            }
+            
+            // Create graph data from filtered transactions
+            const graphData = createGraphFromTransactions(transactions, walletAddress);
+            
+            // Render the graph
+            renderFilteredGraph(graphData, walletAddress, startTime, endTime);
+            
+            // Store filter info for reference
+            window.timeFilterInfo = { walletAddress, startTime, endTime };
+        }
+
+        function createGraphFromTransactions(transactions, walletAddress) {
+            const nodesMap = new Map();
+            const edgesArr = [];
+            
+            // Add the main wallet as a node
+            nodesMap.set(walletAddress, {
+                id: walletAddress,
+                label: walletAddress.length > 20 ? walletAddress.substring(0, 20) + '...' : walletAddress,
+                color: '#00bcd4',
+                size: 30,
+                font: { size: 12, color: '#fff' },
+                borderWidth: 3,
+                borderColor: '#00e5ff'
+            });
+            
+            // Process transactions to create nodes and edges
+            transactions.forEach((tx, index) => {
+                const fromAddresses = Array.isArray(tx.from) ? tx.from : [tx.from];
+                const toAddresses = Array.isArray(tx.to) ? tx.to : [tx.to];
+                
+                // Add nodes for all addresses
+                [...fromAddresses, ...toAddresses].forEach(address => {
+                    if (address && !nodesMap.has(address)) {
+                        const isMainWallet = address === walletAddress;
+                        nodesMap.set(address, {
+                            id: address,
+                            label: address.length > 20 ? address.substring(0, 20) + '...' : address,
+                            color: isMainWallet ? '#00bcd4' : '#4CAF50',
+                            size: isMainWallet ? 30 : 20,
+                            font: { size: isMainWallet ? 12 : 10, color: '#fff' },
+                            borderWidth: isMainWallet ? 3 : 2,
+                            borderColor: isMainWallet ? '#00e5ff' : '#66BB6A'
+                        });
+                    }
+                });
+                
+                // Create edges for transactions
+                fromAddresses.forEach(fromAddr => {
+                    toAddresses.forEach(toAddr => {
+                        if (fromAddr && toAddr && fromAddr !== toAddr) {
+                            const edgeId = `${fromAddr}-${toAddr}-${index}`;
+                            edgesArr.push({
+                                id: edgeId,
+                                from: fromAddr,
+                                to: toAddr,
+                                label: tx.amount || 'N/A',
+                                color: { color: '#FFC107', highlight: '#FFD54F' },
+                                width: 2,
+                                arrows: { to: { enabled: true, scaleFactor: 1.2 } },
+                                font: { size: 10, color: '#fff', strokeWidth: 2, strokeColor: '#000' },
+                                smooth: { enabled: true, type: 'curvedCW', roundness: 0.2 }
+                            });
+                        }
+                    });
+                });
+            });
+            
+            return {
+                nodes: Array.from(nodesMap.values()),
+                edges: edgesArr
+            };
+        }
+
+        function renderFilteredGraph(graphData, walletAddress, startTime, endTime) {
+            console.log('🎨 Rendering filtered graph with', graphData.nodes.length, 'nodes and', graphData.edges.length, 'edges');
+            
+            // Create vis.js datasets
+            const nodes = new vis.DataSet(graphData.nodes);
+            const edges = new vis.DataSet(graphData.edges);
+            const data = { nodes: nodes, edges: edges };
+            
+            // Graph options (similar to main graph with physics disabled)
+            const options = {
+                layout: { improvedLayout: true },
+                physics: {
+                    enabled: false
+                },
+                edges: {
+                    color: { color: '#FFC107', highlight: '#FFD54F' },
+                    width: 2,
+                    arrows: { to: { enabled: true, scaleFactor: 1.2 } }
+                },
+                interaction: {
+                    dragNodes: true,
+                    dragView: true,
+                    zoomView: true,
+                    selectable: true,
+                    hover: true
+                },
+                nodes: { physics: false }
+            };
+            
+            // Destroy existing network if it exists
+            if (window.network) {
+                window.network.destroy();
+                window.network = null;
+            }
+            
+            // Create new network
+            window.network = new vis.Network(document.getElementById('graph'), data, options);
+            
+            // Add title overlay to show filter info
+            addFilteredGraphTitle(walletAddress, startTime, endTime, graphData.nodes.length, graphData.edges.length);
+            
+            console.log('✅ Filtered graph rendered successfully');
+        }
+
+        function addFilteredGraphTitle(walletAddress, startTime, endTime, nodeCount, edgeCount) {
+            // Remove existing title if any
+            const existingTitle = document.getElementById('filteredGraphTitle');
+            if (existingTitle) {
+                existingTitle.remove();
+            }
+            
+            // Create title overlay
+            const titleDiv = document.createElement('div');
+            titleDiv.id = 'filteredGraphTitle';
+            titleDiv.style.cssText = `
+                position: absolute;
+                top: 20px;
+                left: 20px;
+                background: rgba(18, 31, 47, 0.9);
+                border: 2px solid #00bcd4;
+                border-radius: 8px;
+                padding: 15px;
+                color: white;
+                font-family: 'Inter', sans-serif;
+                font-size: 14px;
+                z-index: 1000;
+                max-width: 400px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            `;
+            
+            titleDiv.innerHTML = `
+                <div style="color: #00bcd4; font-weight: bold; margin-bottom: 8px;">
+                    📊 Filtered Transaction Graph
+                </div>
+                <div><strong>Wallet:</strong> ${walletAddress.length > 30 ? walletAddress.substring(0, 30) + '...' : walletAddress}</div>
+                <div><strong>Time Range:</strong> ${startTime} to ${endTime}</div>
+                <div><strong>Nodes:</strong> ${nodeCount} | <strong>Edges:</strong> ${edgeCount}</div>
+                <button onclick="hideFilteredGraph()" style="
+                    margin-top: 10px;
+                    padding: 5px 10px;
+                    background: #00bcd4;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 12px;
+                ">Back to Search</button>
+            `;
+            
+            document.body.appendChild(titleDiv);
+        }
+
+        function hideFilteredGraph() {
+            // Remove title overlay
+            const titleDiv = document.getElementById('filteredGraphTitle');
+            if (titleDiv) {
+                titleDiv.remove();
+            }
+            
+            // Restore the original main graph if it exists
+            if (globalNodes && globalEdges) {
+                console.log('🔄 Restoring original main graph');
+                
+                // Destroy current filtered network
+                if (window.network) {
+                    window.network.destroy();
+                    window.network = null;
+                }
+                
+                // Recreate the original graph
+                const data = { nodes: globalNodes, edges: globalEdges };
+                
+                const options = {
+                    layout: { improvedLayout: true },
+                    physics: {
+                        enabled: false
+                    },
+                    edges: {
+                        color: { color: '#FFC107', highlight: '#FFD54F' },
+                        width: 2,
+                        dashes: [5, 5],
+                        arrows: { to: { enabled: true, scaleFactor: 1.2 } }
+                    },
+                    interaction: {
+                        dragNodes: true,
+                        dragView: true,
+                        zoomView: true,
+                        selectable: true,
+                        hover: true,
+                        hoverConnectedEdges: false
+                    },
+                    nodes: { physics: false }
+                };
+                
+                // Recreate the main graph
+                window.network = new vis.Network(document.getElementById('graph'), data, options);
+                
+                // Keep graph container visible
+                const graphContainer = document.getElementById('graph');
+                if (graphContainer) {
+                    graphContainer.style.display = 'block';
+                }
+                
+                console.log('✅ Original main graph restored successfully');
+            } else {
+                // If no original graph data, hide the graph container
+                const graphContainer = document.getElementById('graph');
+                if (graphContainer) {
+                    graphContainer.style.display = 'none';
+                }
+                
+                // Destroy network
+                if (window.network) {
+                    window.network.destroy();
+                    window.network = null;
+                }
+                
+                console.log('🔙 No original graph to restore, returned to search view');
+            }
+        }
+
+        // ✅ Show receiver end analysis
+        function showReceiverEnd() {
+            if (!network) {
+                alert('No graph data available. Please search for a transaction first.');
+                return;
+            }
+
+            // Get all nodes and find receiver nodes (nodes with only incoming connections)
+            const nodes = network.body.data.nodes.get();
+            const edges = network.body.data.edges.get();
+
+            // Find nodes that only receive (have incoming edges but no outgoing edges)
+            const receiverNodes = nodes.filter(node => {
+                const incomingEdges = edges.filter(edge => edge.to === node.id);
+                const outgoingEdges = edges.filter(edge => edge.from === node.id);
+                return incomingEdges.length > 0 && outgoingEdges.length === 0;
+            });
+
+            if (receiverNodes.length === 0) {
+                alert('No receiver end nodes found in the current transaction network.');
+                return;
+            }
+
+            // Don't change node colors - just proceed to show receiver details
+
+            // Open receiver details in new page
+            openReceiverDetailsPage(receiverNodes, edges);
+        }
+
+        // ✅ Open receiver details in table format
+        function openReceiverDetailsPage(receiverNodes, edges) {
+            // Create receiver data with transaction details
+            const receiverData = receiverNodes.map(node => {
+                const incomingEdges = edges.filter(edge => edge.to === node.id);
+                const totalReceived = incomingEdges.reduce((sum, edge) => {
+                    const amount = parseFloat(edge.label?.replace(' BTC', '') || '0');
+                    return sum + amount;
+                }, 0);
+
+                return {
+                    receiverId: node.id,
+                    receiverLabel: node.label || node.id,
+                    incomingTransactions: incomingEdges.length,
+                    totalReceived: totalReceived.toFixed(8),
+                    senderIds: incomingEdges.map(edge => edge.from).join(', ')
+                };
+            });
+
+            // Create the receiver details page
+            const receiverWindow = window.open('', '_blank');
+            receiverWindow.document.write(`
+                <!DOCTYPE html>
+                <html lang="en">
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <title>Receiver End Analysis</title>
+                    <style>
+                        body {
+                            font-family: Arial, sans-serif;
+                            background: #121212;
+                            color: white;
+                            margin: 0;
+                            padding: 20px;
+                        }
+                        .header {
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            margin-bottom: 20px;
+                            padding-bottom: 10px;
+                            border-bottom: 2px solid #00bcd4;
+                        }
+                        .title {
+                            color: #00e5ff;
+                            font-size: 24px;
+                            margin: 0;
+                        }
+                        .back-btn, .print-btn {
+                            padding: 10px 20px;
+                            color: white;
+                            border: none;
+                            border-radius: 4px;
+                            cursor: pointer;
+                            font-size: 14px;
+                            font-weight: bold;
+                            margin-left: 10px;
+                        }
+                        .back-btn {
+                            background-color: #4CAF50;
+                        }
+                        .back-btn:hover {
+                            background-color: #45a049;
+                        }
+                        .print-btn {
+                            background-color: #00bcd4;
+                        }
+                        .print-btn:hover {
+                            background-color: #0097a7;
+                        }
+                        .summary {
+                            background: rgba(0, 188, 212, 0.1);
+                            padding: 15px;
+                            border-radius: 8px;
+                            margin-bottom: 20px;
+                            border-left: 4px solid #00bcd4;
+                        }
+                        table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            background: #1e1e1e;
+                        }
+                        th, td {
+                            border: 1px solid #333;
+                            padding: 12px;
+                            text-align: left;
+                            word-wrap: break-word;
+                        }
+                        th {
+                            background: #FF6B6B;
+                            font-weight: bold;
+                            color: white;
+                        }
+                        tr:nth-child(even) {
+                            background: rgba(255, 107, 107, 0.1);
+                        }
+                        .receiver-id {
+                            font-family: monospace;
+                            font-size: 12px;
+                            max-width: 200px;
+                            overflow-wrap: break-word;
+                        }
+                        .amount {
+                            font-weight: bold;
+                            color: #4CAF50;
+                        }
+                        .count {
+                            font-weight: bold;
+                            color: #00bcd4;
+                        }
+                        @media print {
+                            body {
+                                background: white !important;
+                                color: black !important;
+                            }
+                            .header {
+                                border-bottom: 2px solid #000 !important;
+                            }
+                            .title {
+                                color: #000 !important;
+                            }
+                            .back-btn, .print-btn {
+                                display: none !important;
+                            }
+                            button {
+                                display: none !important;
+                            }
+                            .list-buttons {
+                                display: none !important;
+                            }
+                            .summary {
+                                background: #f5f5f5 !important;
+                                color: black !important;
+                                border-left: 4px solid #000 !important;
+                            }
+                            table {
+                                background: white !important;
+                            }
+                            th {
+                                background: #ddd !important;
+                                color: black !important;
+                            }
+                            td {
+                                color: black !important;
+                            }
+                            tr:nth-child(even) {
+                                background: #f9f9f9 !important;
+                            }
+                            .amount {
+                                color: #000 !important;
+                                font-weight: bold;
+                            }
+                            .count {
+                                color: #000 !important;
+                                font-weight: bold;
+                            }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h2 class="title">🎯 Receiver End Analysis</h2>
+                        <div>
+                            <button class="print-btn" onclick="window.print()">🖨️ Print</button>
+                            <button class="back-btn" onclick="window.close()">← Back to Graph</button>
+                        </div>
+                    </div>
+                    
+                    <div class="summary">
+                        <h3>Summary</h3>
+                        <p><strong>Total Receiver Nodes Found:</strong> ${receiverData.length}</p>
+                        <p><strong>Analysis:</strong> These are transaction endpoints that only receive Bitcoin without sending it further.</p>
+                    </div>
+
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Receiver ID</th>
+                                <th>Label</th>
+                                <th>Incoming Transactions</th>
+                                <th>Total Received (BTC)</th>
+                                <th>Sender IDs</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${receiverData.map(receiver => `
+                                <tr>
+                                    <td class="receiver-id">${receiver.receiverId}</td>
+                                    <td>${receiver.receiverLabel}</td>
+                                    <td class="count">${receiver.incomingTransactions}</td>
+                                    <td class="amount">${receiver.totalReceived} BTC</td>
+                                    <td class="receiver-id">${receiver.senderIds}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </body>
+                </html>
+            `);
+            receiverWindow.document.close();
+        }
+
+        // ✅ Handle Enter key press in search input
+        function handleEnterKey(event) {
+            if (event.key === 'Enter' || event.keyCode === 13) {
+                event.preventDefault();
+                searchTransaction();
+            }
+        }
+
+        // About popup functions
+        function showAboutModal() {
+            const popup = document.getElementById('aboutPopup');
+            popup.style.display = 'block';
+        }
+
+        function closeAboutModal() {
+            const popup = document.getElementById('aboutPopup');
+            popup.style.display = 'none';
+        }
+
+        // Close popup when clicking outside
+        document.addEventListener('click', function (e) {
+            const popup = document.getElementById('aboutPopup');
+            const helpIcon = document.querySelector('.help-icon');
+            if (popup.style.display === 'block' && !popup.contains(e.target) && !helpIcon.contains(e.target)) {
+                closeAboutModal();
+            }
+        });
+
+        // Close popup with Escape key
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                closeAboutModal();
+            }
+        });
+
+        // ✅ Show help modal
+        function showHelpModal() {
+            document.getElementById('helpModal').style.display = 'block';
+        }
+
+        // ✅ Close help modal
+        function closeHelpModal() {
+            document.getElementById('helpModal').style.display = 'none';
+        }
+
+        // ✅ Close modal when clicking outside of it
+        window.onclick = function (event) {
+            const modal = document.getElementById('helpModal');
+            if (event.target === modal) {
+                closeHelpModal();
+            }
+        }
+
+        // ✅ Handle photo upload
+        function handlePhotoUpload(photoNumber, input) {
+            const file = input.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    const preview = document.getElementById(`photo${photoNumber}Preview`);
+                    const placeholder = document.getElementById(`photo${photoNumber}Placeholder`);
+                    const container = document.getElementById(`photo${photoNumber}Container`);
+
+                    // Show the image preview
+                    preview.style.backgroundImage = `url(${e.target.result})`;
+                    preview.style.display = 'block';
+                    placeholder.style.display = 'none';
+
+                    // Change container style to show image is uploaded
+                    container.style.border = '2px solid #00bcd4';
+                    container.style.background = 'transparent';
+
+                    console.log(`Photo ${photoNumber} uploaded successfully`);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // ✅ Save designer information
+        function saveDesignerInfo() {
+            const designerInfo = {
+                designer1: {
+                    name: document.getElementById('name1').value,
+                    photo: document.getElementById('photo1Preview').style.backgroundImage
+                },
+                designer2: {
+                    name: document.getElementById('name2').value,
+                    photo: document.getElementById('photo2Preview').style.backgroundImage
+                },
+                designer3: {
+                    name: document.getElementById('name3').value,
+                    photo: document.getElementById('photo3Preview').style.backgroundImage
+                }
+            };
+
+            // Save to localStorage
+            localStorage.setItem('designerInfo', JSON.stringify(designerInfo));
+
+            // Show success message
+            alert('Designer information saved successfully!');
+            console.log('Designer info saved:', designerInfo);
+        }
+
+        // ✅ Clear all photos and names
+        function clearAllPhotos() {
+            for (let i = 1; i <= 3; i++) {
+                const preview = document.getElementById(`photo${i}Preview`);
+                const placeholder = document.getElementById(`photo${i}Placeholder`);
+                const container = document.getElementById(`photo${i}Container`);
+                const nameInput = document.getElementById(`name${i}`);
+                const fileInput = document.getElementById(`photo${i}Input`);
+
+                // Reset preview
+                preview.style.backgroundImage = '';
+                preview.style.display = 'none';
+                placeholder.style.display = 'block';
+
+                // Reset container style
+                container.style.border = '2px dashed #00bcd4';
+                container.style.background = 'rgba(0, 188, 212, 0.1)';
+
+                // Clear name input
+                nameInput.value = '';
+
+                // Clear file input
+                fileInput.value = '';
+            }
+
+            // Clear from localStorage
+            localStorage.removeItem('designerInfo');
+
+            alert('All designer information cleared!');
+            console.log('All designer info cleared');
+        }
+
+        // ✅ Load saved designer information on page load
+        function loadSavedDesignerInfo() {
+            const savedInfo = localStorage.getItem('designerInfo');
+            if (savedInfo) {
+                try {
+                    const designerInfo = JSON.parse(savedInfo);
+
+                    // Load each designer's info
+                    for (let i = 1; i <= 3; i++) {
+                        const designer = designerInfo[`designer${i}`];
+                        if (designer && designer.name) {
+                            document.getElementById(`name${i}`).value = designer.name;
+                        }
+                        if (designer && designer.photo && designer.photo !== '') {
+                            const preview = document.getElementById(`photo${i}Preview`);
+                            const placeholder = document.getElementById(`photo${i}Placeholder`);
+                            const container = document.getElementById(`photo${i}Container`);
+
+                            preview.style.backgroundImage = designer.photo;
+                            preview.style.display = 'block';
+                            placeholder.style.display = 'none';
+                            container.style.border = '2px solid #00bcd4';
+                            container.style.background = 'transparent';
+                        }
+                    }
+
+                    console.log('Loaded saved designer info:', designerInfo);
+                } catch (error) {
+                    console.error('Error loading saved designer info:', error);
+                }
+            }
+        }
+
+
+
+
+
+
+
+        // ✅ Show time filter status
+        function showTimeFilterStatus(startStr, endStr, resultCount) {
+            // Remove existing status if any
+            hideTimeFilterStatus();
+
+            // Create status indicator
+            const statusDiv = document.createElement('div');
+            statusDiv.id = 'timeFilterStatus';
+            statusDiv.style.cssText = `
+                position: fixed;
+                top: 200px;
+                right: 20px;
+                background: var(--accent-color);
+                color: white;
+                padding: 10px 15px;
+                border-radius: 8px;
+                font-size: 12px;
+                z-index: 1000;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                max-width: 300px;
+            `;
+
+            statusDiv.innerHTML = `
+                <div style="font-weight: bold; margin-bottom: 5px;">
+                    <i class="fas fa-clock"></i> Time Filter Active
+                </div>
+                <div>From: ${startStr}</div>
+                <div>To: ${endStr}</div>
+                <div style="margin-top: 5px; font-weight: bold;">
+                    Results: ${resultCount} transactions
+                </div>
+            `;
+
+            document.body.appendChild(statusDiv);
+
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                hideTimeFilterStatus();
+            }, 5000);
+        }
+
+        // ✅ Hide time filter status
+        function hideTimeFilterStatus() {
+            const existing = document.getElementById('timeFilterStatus');
+            if (existing) {
+                existing.remove();
+            }
+        }
+
+        // ✅ Load sample transactions when wallet not found
+        async function loadSampleTransactions() {
+            console.log('Loading sample transactions...');
+            document.getElementById('loading').style.display = 'block';
+
+            try {
+                // Call the API without any specific wallet to get sample data
+                const response = await fetch('api.php');
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const sampleData = await response.json();
+                console.log('Sample data loaded:', sampleData);
+
+                if (sampleData && sampleData.length > 0) {
+                    // Update global variables
+                    transactions = sampleData;
+                    window.currentTransactions = sampleData;
+
+                    // Clear time filter info
+                    window.timeFilterInfo = null;
+
+                    // Reset search input
+                    document.getElementById('searchInput').value = '';
+                    clearTimeFilter();
+
+                    // Draw the graph
+                    drawGraph(transactions);
+
+                    // Show success message
+                    alert(`✅ Loaded ${sampleData.length} sample transactions for testing.\n\nYou can now:\n• View the transaction graph\n• Click the "List" button to see all transactions\n• Try searching for specific wallet addresses from the sample data`);
+
+                    // Show receiver end button
+                    document.getElementById('receiverEndBtn').style.display = 'inline-block';
+
+                    // Show Time Filter button
+                    document.getElementById('timeFilterBtn').style.display = 'inline-block';
+                } else {
+                    alert('❌ No sample data available in the database.\n\nPlease check your database connection and ensure it contains transaction data.');
+                }
+
+            } catch (error) {
+                console.error('Error loading sample transactions:', error);
+                alert('❌ Failed to load sample data.\n\nError: ' + error.message + '\n\nPlease check your database connection.');
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
+        // ✅ Update list title with time filter info
+        function updateListTitle() {
+            const listTitle = document.getElementById('listTitle');
+            if (!listTitle) return;
+
+            let title = 'All Transactions';
+
+            if (window.timeFilterInfo && (window.timeFilterInfo.startDate || window.timeFilterInfo.endDate)) {
+                const { startDate, endDate, walletAddress } = window.timeFilterInfo;
+
+                title = `Transactions for ${walletAddress}`;
+
+                if (startDate && endDate) {
+                    const start = new Date(startDate).toLocaleDateString();
+                    const end = new Date(endDate).toLocaleDateString();
+                    title += ` (${start} - ${end})`;
+                } else if (startDate) {
+                    const start = new Date(startDate).toLocaleDateString();
+                    title += ` (from ${start})`;
+                } else if (endDate) {
+                    const end = new Date(endDate).toLocaleDateString();
+                    title += ` (until ${end})`;
+                }
+            }
+
+            listTitle.textContent = title;
+        }
+
+
+
+        // ✅ Search button - now searches database directly
+        async function searchTransaction() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) return alert('Please enter a Wallet Address');
+
+            document.getElementById('loading').style.display = 'block';
+
+            try {
+                // Search by wallet address
+                const response = await fetch(`api.php?action=wallet&address=${encodeURIComponent(query)}`);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                let chainData = await response.json();
+                console.log('API Response:', chainData);
+
+                if (chainData.error) {
+                    console.error('API Error:', chainData.error);
+                    document.getElementById('loading').style.display = 'none';
+
+                    // Show user-friendly error message
+                    let errorMessage = `❌ Wallet Address Not Found\n\nAddress: ${query}`;
+                    errorMessage += '\n\n💡 Possible reasons:\n• Wallet address not in your database\n• No transactions recorded for this address\n• Address format may be incorrect\n• Database connection issue';
+                    errorMessage += '\n\n🔍 To test, try searching without any specific address to see available data.';
+
+                    // Also log the error for debugging
+                    console.error('Wallet search failed:', {
+                        query: query,
+                        apiError: chainData.error
+                    });
+
+                    // Ask user if they want to see sample data
+                    const showSample = confirm(errorMessage + '\n\n❓ Would you like to load sample transaction data to test the interface?');
+
+                    if (showSample) {
+                        loadSampleTransactions();
+                    }
+
+                    return;
+                }
+
+                if (!chainData || chainData.length === 0) {
+                    console.log('No data returned from API');
+                    document.getElementById('loading').style.display = 'none';
+
+                    let noDataMessage = `📭 No Transactions Found\n\nWallet: ${query}`;
+                    noDataMessage += '\n\nThe wallet address exists but has no transaction data.';
+
+                    return alert(noDataMessage);
+                }
+
+
+
+                // Update the global transactions array with the search results
+                transactions = chainData;
+                // Cache transactions for list view
+                window.currentTransactions = chainData;
+
+
+
+                console.log('Found transaction data:', transactions);
+
+                // Reset all global variables for fresh search
+                infoNodeIds.clear();
+                labelMode = 'original';
+
+                // Draw the full graph with the found transaction chain
+                drawGraph(transactions);
+
+                // Clear the search input for next search
+                document.getElementById('searchInput').value = '';
+                document.getElementById('loading').style.display = 'none';
+
+                // Show receiver end button after successful search
+                document.getElementById('receiverEndBtn').style.display = 'inline-block';
+
+                // Show Time Filter button after successful search
+                document.getElementById('timeFilterBtn').style.display = 'inline-block';
+
+                // Store search ID for time filtering
+                currentSearchId = query;
+
+                // Highlight searched wallet after graph is drawn
+                setTimeout(() => {
+                    const allNodes = network.body.data.nodes.get();
+                    const matchingNode = allNodes.find(node =>
+                        node.id.toLowerCase() === query.toLowerCase()
+                    );
+
+                    if (matchingNode) {
+                        console.log('Highlighting wallet:', matchingNode.id);
+                        network.body.data.nodes.update({
+                            id: matchingNode.id,
+                            color: {
+                                background: '#FF00FF',
+                                border: '#CC00CC',
+                                highlight: {
+                                    background: '#FF33FF',
+                                    border: '#B300B3'
+                                }
+                            },
+                            borderWidth: 5,
+                            shadow: {
+                                enabled: true,
+                                color: 'rgba(255, 0, 255, 0.8)',
+                                size: 15,
+                                x: 0,
+                                y: 0
+                            }
+                        });
+
+                        setTimeout(() => {
+                            network.focus(matchingNode.id, {
+                                scale: 1.2,
+                                animation: { duration: 1000, easingFunction: 'easeInOutQuad' }
+                            });
+                        }, 100);
+                    }
+                }, 500);
+
+            } catch (error) {
+                console.error('Error searching transaction:', error);
+                document.getElementById('loading').style.display = 'none';
+                alert('Failed to search transaction. Please check your database connection.');
+            }
+        }
+
+        // ✅ Copy text to clipboard function
+        function copyToClipboard(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                // Use modern clipboard API
+                navigator.clipboard.writeText(text).then(() => {
+                    console.log('Text copied to clipboard:', text);
+                }).catch(err => {
+                    console.error('Failed to copy text: ', err);
+                    fallbackCopyTextToClipboard(text);
+                });
+            } else {
+                // Fallback for older browsers
+                fallbackCopyTextToClipboard(text);
+            }
+        }
+
+        // ✅ Fallback copy function for older browsers
+        function fallbackCopyTextToClipboard(text) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.top = "0";
+            textArea.style.left = "0";
+            textArea.style.position = "fixed";
+            textArea.style.opacity = "0";
+
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+
+            try {
+                const successful = document.execCommand('copy');
+                if (successful) {
+                    console.log('Text copied to clipboard (fallback):', text);
+                } else {
+                    console.error('Failed to copy text (fallback)');
+                }
+            } catch (err) {
+                console.error('Fallback copy failed:', err);
+            }
+
+            document.body.removeChild(textArea);
+        }
+
+        // ✅ Show copy notification
+        function showCopyNotification(message) {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.textContent = message;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #4caf50;
+                color: white;
+                padding: 12px 20px;
+                border-radius: 6px;
+                font-size: 14px;
+                font-weight: 600;
+                z-index: 10000;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                animation: slideIn 0.3s ease-out;
+            `;
+
+            // Add animation keyframes if not already added
+            if (!document.getElementById('copyNotificationStyles')) {
+                const style = document.createElement('style');
+                style.id = 'copyNotificationStyles';
+                style.textContent = `
+                    @keyframes slideIn {
+                        from { transform: translateX(100%); opacity: 0; }
+                        to { transform: translateX(0); opacity: 1; }
+                    }
+                    @keyframes slideOut {
+                        from { transform: translateX(0); opacity: 1; }
+                        to { transform: translateX(100%); opacity: 0; }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+
+            // Add notification to page
+            document.body.appendChild(notification);
+
+            // Remove notification after 3 seconds
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease-in';
+                setTimeout(() => {
+                    if (notification.parentNode) {
+                        document.body.removeChild(notification);
+                    }
+                }, 300);
+            }, 3000);
+        }
+
+        // ✅ Transaction List Functions
+        function showTransactionList(txId) {
+            console.log('Showing transaction list for:', txId);
+
+            // Hide graph and show transaction list
+            document.getElementById('graph').style.display = 'none';
+            document.getElementById('transactionList').style.display = 'block';
+
+            // Update title
+            document.getElementById('listTitle').innerText = `Transaction Chain: ${txId.substring(0, 16)}...`;
+
+            // Load transaction data
+            loadTransactionData(txId);
+        }
+
+        // ✅ Enhanced "Back to Graph" button functionality
+        function hideTransactionList() {
+            console.log('🔙 Back to Graph button clicked');
+
+            // Use toggle function to hide list with smooth transition
+            toggleListView(false);
+
+            // Clear any cached list data to free memory
+            if (window.listTransactions) {
+                console.log('Clearing cached list transaction data');
+                delete window.listTransactions;
+            }
+
+            // Reset any table state
+            resetTableState();
+
+            // Ensure graph is properly visible and interactive
+            setTimeout(() => {
+                const graph = document.getElementById('graph');
+                if (graph && network) {
+                    // Refresh network layout if needed
+                    try {
+                        network.redraw();
+                        console.log('Graph view restored and refreshed');
+                    } catch (error) {
+                        console.warn('Could not refresh graph layout:', error);
+                    }
+                }
+            }, 350); // Wait for transition to complete
+        }
+
+        // ✅ Enhanced print functionality with proper state management
+        function printTransactionList() {
+            console.log('🖨️ Print button clicked');
+
+            const transactionList = document.getElementById('transactionList');
+            const graph = document.getElementById('graph');
+
+            if (!transactionList || transactionList.style.display === 'none') {
+                console.warn('Cannot print: transaction list is not visible');
+                alert('Please ensure the transaction list is visible before printing.');
+                return;
+            }
+
+            // Check if there's data to print
+            const tableBody = document.getElementById('transactionTableBody');
+            const dataRows = tableBody ? tableBody.querySelectorAll('tr:not(.loading-row):not(.error-row)') : [];
+
+            if (dataRows.length === 0) {
+                console.warn('Cannot print: no transaction data available');
+                alert('No transaction data available to print.');
+                return;
+            }
+
+            console.log(`Preparing to print ${dataRows.length} transactions`);
+
+            // Store original states
+            const originalGraphDisplay = graph ? graph.style.display : 'none';
+            const originalListDisplay = transactionList.style.display;
+
+            try {
+                // Hide graph and ensure list is visible for printing
+                if (graph) graph.style.display = 'none';
+                transactionList.style.display = 'block';
+                transactionList.style.opacity = '1';
+
+                // Add print-specific styling
+                document.body.classList.add('printing');
+
+                // Trigger print dialog
+                window.print();
+
+                console.log('Print dialog opened successfully');
+
+            } catch (error) {
+                console.error('Error during printing:', error);
+                alert('An error occurred while preparing the print view. Please try again.');
+            } finally {
+                // Restore original states after a short delay
+                setTimeout(() => {
+                    // Remove print-specific styling
+                    document.body.classList.remove('printing');
+
+                    // Restore original display states
+                    if (graph) graph.style.display = originalGraphDisplay;
+                    transactionList.style.display = originalListDisplay;
+
+                    console.log('Print state cleanup completed');
+                }, 100);
+            }
+        }
+
+        // ✅ Reset table state helper function
+        function resetTableState() {
+            const tableBody = document.getElementById('transactionTableBody');
+            const loadingRow = document.getElementById('loadingRow');
+            const errorRow = document.getElementById('errorRow');
+
+            if (tableBody) {
+                // Remove all data rows but keep loading and error rows
+                const dataRows = tableBody.querySelectorAll('tr:not(.loading-row):not(.error-row)');
+                dataRows.forEach(row => row.remove());
+            }
+
+            // Reset loading and error states
+            if (loadingRow) loadingRow.style.display = 'none';
+            if (errorRow) errorRow.style.display = 'none';
+
+            console.log('Table state reset completed');
+        }
+
+        async function loadTransactionData(txId) {
+            const tableBody = document.querySelector('#transactionTable tbody');
+
+            try {
+                console.log('Loading transaction data for:', txId);
+
+                // Show loading message
+                tableBody.innerHTML = '<tr><td colspan="7" class="loading-row">Loading transaction data...</td></tr>';
+
+                // Call API - same domain, no path issues!
+                const response = await fetch(`api.php?action=chain&txid=${encodeURIComponent(txId)}`);
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error('API Error:', response.status, response.statusText, errorText);
+                    tableBody.innerHTML = `<tr><td colspan="7" class="error-row">Failed to load data: ${response.status} - ${response.statusText}</td></tr>`;
+                    return;
+                }
+
+                const transactions = await response.json();
+                console.log('Received transactions:', transactions);
+
+                if (transactions.error) {
+                    tableBody.innerHTML = `<tr><td colspan="7" class="error-row">Database Error: ${transactions.error}</td></tr>`;
+                    return;
+                }
+
+                if (!transactions || transactions.length === 0) {
+                    tableBody.innerHTML = `<tr><td colspan="7" class="error-row">No transactions found for ${txId}</td></tr>`;
+                    return;
+                }
+
+                // Clear loading message and display transactions
+                tableBody.innerHTML = '';
+
+                transactions.forEach(tx => {
+                    const row = document.createElement('tr');
+
+                    // Handle from addresses
+                    const fromAddresses = Array.isArray(tx.from) ? tx.from.join(', ') : (tx.from || 'N/A');
+
+                    // Handle to addresses
+                    const toAddresses = Array.isArray(tx.to) ? tx.to.join(', ') : (tx.to || 'N/A');
+
+                    // Format values
+                    const totalInput = tx.total_input || 'N/A';
+                    const totalOutput = tx.total_output || 'N/A';
+                    const fees = tx.fees || 'N/A';
+                    const formattedDate = tx.date || 'N/A';
+
+                    row.innerHTML = `
+                        <td title="${tx.id}">${tx.id}</td>
+                        <td>${fromAddresses}</td>
+                        <td>${toAddresses}</td>
+                        <td>${totalInput}</td>
+                        <td>${totalOutput}</td>
+                        <td>${fees}</td>
+                        <td>${formattedDate}</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+
+                console.log(`Loaded ${transactions.length} transactions successfully`);
+
+            } catch (error) {
+                console.error('Error loading transaction data:', error);
+                tableBody.innerHTML = `<tr><td colspan="7" class="error-row">Connection Error: ${error.message}</td></tr>`;
+            }
+        }
+
+        // ✅ Initialize the application
+        window.addEventListener('DOMContentLoaded', () => {
+            console.log('Application initializing...');
+
+            // Add Enter key listener to search input
+            const searchInput = document.getElementById('searchInput');
+
+            // Enhanced Enter key handling for search
+            searchInput.addEventListener('keypress', function (event) {
+                if (event.key === 'Enter' || event.keyCode === 13) {
+                    event.preventDefault();
+                    console.log('🔍 Enter key pressed - Starting search...');
+                    searchTransaction();
+                }
+            });
+
+            // Additional keydown listener as backup for better compatibility
+            searchInput.addEventListener('keydown', function (event) {
+                if (event.key === 'Enter' || event.keyCode === 13) {
+                    event.preventDefault();
+                    console.log('🔍 Enter keydown detected - Starting search...');
+                    searchTransaction();
+                }
+            });
+
+            // Add event listener for list button
+            const listBtn = document.getElementById('listBtn');
+            if (listBtn) {
+                listBtn.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    console.log('📋 List button clicked - Showing transaction list...');
+                    showAllTransactionsList();
+                });
+            }
+
+
+
+            // Add keyboard shortcut to close transaction list (Escape key)
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') {
+                    const transactionList = document.getElementById('transactionList');
+                    if (transactionList && transactionList.style.display === 'block') {
+                        event.preventDefault();
+                        console.log('⌨️ Escape key pressed - Hiding transaction list...');
+                        hideTransactionList();
+                    }
+                }
+            });
+
+            // Add event listeners for navigation controls
+            const backBtn = document.querySelector('.back-btn');
+            if (backBtn) {
+                backBtn.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    console.log('🔙 Back button event listener triggered');
+                    hideTransactionList();
+                });
+            }
+
+            const printBtn = document.querySelector('.print-btn');
+            if (printBtn) {
+                printBtn.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    console.log('🖨️ Print button event listener triggered');
+                    printTransactionList();
+                });
+            }
+
+            // Add keyboard shortcuts for navigation
+            document.addEventListener('keydown', function (event) {
+                const transactionList = document.getElementById('transactionList');
+                const isListVisible = transactionList && transactionList.style.display === 'block';
+
+                if (isListVisible) {
+                    // Ctrl+P or Cmd+P for print (prevent default browser print)
+                    if ((event.ctrlKey || event.metaKey) && event.key === 'p') {
+                        event.preventDefault();
+                        console.log('⌨️ Ctrl/Cmd+P pressed - Printing transaction list...');
+                        printTransactionList();
+                    }
+
+                    // Alt+Left Arrow for back navigation
+                    if (event.altKey && event.key === 'ArrowLeft') {
+                        event.preventDefault();
+                        console.log('⌨️ Alt+Left Arrow pressed - Going back to graph...');
+                        hideTransactionList();
+                    }
+                }
+            });
+
+            // Visual feedback when typing
+            searchInput.addEventListener('input', function (event) {
+                const value = event.target.value.trim();
+                if (value.length > 0) {
+                    event.target.style.borderColor = '#00bcd4';
+                } else {
+                    event.target.style.borderColor = '';
+                }
+            });
+
+            // Add event listeners for time filter inputs
+            const startDateInput = document.getElementById('startDate');
+            const endDateInput = document.getElementById('endDate');
+            const clearTimeFilterBtn = document.getElementById('clearTimeFilter');
+
+            if (startDateInput) {
+                startDateInput.addEventListener('change', function (event) {
+                    console.log('📅 Start date changed:', event.target.value);
+                    // Auto-set end date to same day if not set
+                    if (event.target.value && !endDateInput.value) {
+                        const startDate = new Date(event.target.value);
+                        startDate.setHours(23, 59, 59, 999); // End of day
+                        endDateInput.value = startDate.toISOString().slice(0, 16);
+                    }
+                });
+            }
+
+            if (endDateInput) {
+                endDateInput.addEventListener('change', function (event) {
+                    console.log('📅 End date changed:', event.target.value);
+                    // Validate that end date is not before start date
+                    if (startDateInput.value && event.target.value) {
+                        if (new Date(event.target.value) < new Date(startDateInput.value)) {
+                            alert('End date cannot be before start date');
+                            event.target.value = '';
+                        }
+                    }
+                });
+            }
+
+            // Add event listeners for Time Filter inputs to toggle View Type visibility
+            const startTimeInput = document.getElementById('startTime');
+            const endTimeInput = document.getElementById('endTime');
+
+            if (startTimeInput) {
+                startTimeInput.addEventListener('input', function (event) {
+                    console.log('🕒 Start time changed:', event.target.value);
+                    checkBothDatesProvided();
+                });
+            }
+
+            if (endTimeInput) {
+                endTimeInput.addEventListener('input', function (event) {
+                    console.log('🕒 End time changed:', event.target.value);
+                    checkBothDatesProvided();
+                });
+            }
+
+            // Add event listeners for View Type radio buttons
+            const viewTypeList = document.getElementById('viewTypeList');
+            const viewTypeGraph = document.getElementById('viewTypeGraph');
+
+            if (viewTypeList) {
+                viewTypeList.addEventListener('change', function (event) {
+                    if (event.target.checked) {
+                        console.log('📋 List view selected');
+                    }
+                });
+            }
+
+            if (viewTypeGraph) {
+                viewTypeGraph.addEventListener('change', function (event) {
+                    if (event.target.checked) {
+                        console.log('📊 Graph view selected');
+                    }
+                });
+            }
+
+            if (clearTimeFilterBtn) {
+                clearTimeFilterBtn.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    console.log('🗑️ Clear time filter button clicked');
+                    clearTimeFilter();
+                });
+            }
+
+            // Add keyboard support for time filter overlay
+            document.addEventListener('keydown', function (event) {
+                const timeFilterOverlay = document.getElementById('timeFilter');
+                if (timeFilterOverlay && timeFilterOverlay.style.display === 'flex') {
+                    if (event.key === 'Escape') {
+                        event.preventDefault();
+                        hideTimeFilter();
+                    } else if (event.key === 'Enter') {
+                        event.preventDefault();
+                        applyTimeFilter();
+                    }
+                }
+            });
+
+            // Focus on search input for immediate typing
+            searchInput.focus();
+
+            console.log('Application ready!');
+
+            // Theme handling
+            initializeTheme();
+        });
+
+        // Theme management functions
+        function initializeTheme() {
+            // Check if user has a saved theme preference
+            const savedTheme = localStorage.getItem('theme');
+
+            if (savedTheme) {
+                // Use saved preference
+                setTheme(savedTheme);
+            } else {
+                // Use system preference
+                const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                setTheme(systemPrefersDark ? 'dark' : 'light');
+            }
+
+            // Listen for system theme changes
+            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+                if (!localStorage.getItem('theme')) {
+                    // Only auto-switch if user hasn't set a manual preference
+                    setTheme(e.matches ? 'dark' : 'light');
+                }
+            });
+
+            console.log('Theme system initialized');
+        }
+
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+
+            // Update CSS custom properties based on theme
+            if (theme === 'light') {
+                document.documentElement.style.setProperty('--bg-primary', '#f5f5f5');
+                document.documentElement.style.setProperty('--text-primary', '#333');
+                document.documentElement.style.setProperty('--accent-color', '#0077b6');
+                document.documentElement.style.setProperty('--card-bg', 'rgba(255, 255, 255, 0.95)');
+                document.documentElement.style.setProperty('--bg-secondary', 'rgba(255, 255, 255, 0.9)');
+                document.documentElement.style.setProperty('--border-color', '#ddd');
+                document.documentElement.style.setProperty('--text-secondary', '#666');
+                document.documentElement.style.setProperty('--accent-hover', '#005a8a');
+            } else {
+                document.documentElement.style.setProperty('--bg-primary', '#000');
+                document.documentElement.style.setProperty('--text-primary', 'white');
+                document.documentElement.style.setProperty('--accent-color', '#00bcd4');
+                document.documentElement.style.setProperty('--card-bg', 'rgba(18, 31, 47, 0.9)');
+                document.documentElement.style.setProperty('--bg-secondary', 'rgba(0, 0, 0, 0.7)');
+                document.documentElement.style.setProperty('--border-color', '#333');
+                document.documentElement.style.setProperty('--text-secondary', '#ffffff');
+                document.documentElement.style.setProperty('--accent-hover', '#0097a7');
+            }
+        }
+
+        function toggleTheme() {
+            const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            setTheme(newTheme);
+            localStorage.setItem('theme', newTheme);
+        }
+    </script>
+</body>
+
+</html>
